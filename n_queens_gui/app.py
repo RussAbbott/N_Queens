@@ -5,6 +5,20 @@ from ortools.sat.python import cp_model
 
 
 def solve_n_queens(n, method="backtrack"):
+    """
+    Find all solutions to the N-Queens problem using backtracking.
+
+    Parameters:
+        n: int
+            Number of queens (and board size).
+        method: str
+            "backtrack" to collect all solutions before returning;
+            "generator" to yield each solution lazily as it is found.
+
+    Returns:
+        List[List[int]]: list of solutions, each a list of n column indices
+        where solution[r] is the column of the queen in row r.
+    """
     # queens[r] is the column of the queen in row r — the same role as the
     # decision variable queens[r] in the CP version.
     queens = [-1] * n
@@ -75,6 +89,21 @@ class Queen:
 
 
 def solve_n_queens_propagation(n):
+    """
+    Find all solutions to the N-Queens problem using domain propagation.
+
+    Each queen is represented as a Queen object whose avail_cols is pruned
+    as columns are assigned. New Queen objects are created on each recursive
+    call rather than mutating in place, so backtracking requires no undo step.
+
+    Parameters:
+        n: int
+            Number of queens (and board size).
+
+    Returns:
+        List[List[int]]: list of solutions, each a list of n column indices
+        where solution[r] is the column of the queen in row r.
+    """
     solutions = []
 
     def search(row, queens, assignment):
@@ -160,6 +189,20 @@ def solve_n_queens_propagation(n):
 
 
 def solve_n_queens_cp(n):
+    """
+    Find all solutions to the N-Queens problem using the OR-Tools CP-SAT solver.
+
+    Models each row's queen column as an integer decision variable, then adds
+    all-different constraints for columns and both diagonal directions.
+
+    Parameters:
+        n: int
+            Number of queens (and board size).
+
+    Returns:
+        List[List[int]]: list of solutions, each a list of n column indices
+        where solution[r] is the column of the queen in row r.
+    """
     model = cp_model.CpModel()
 
     # Each queens[r] is a decision variable representing the column of the queen
