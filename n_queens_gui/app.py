@@ -12,8 +12,11 @@ def solve_n_queens(n, method="backtrack"):
         n: int
             Number of queens (and board size).
         method: str
-            "backtrack" to collect all solutions before returning;
-            "generator" to yield each solution lazily as it is found.
+            "backtrack" to accumulate solutions via explicit undo steps;
+            "generator" to find solutions via a Python generator internally.
+            The difference between the two methods is about how the search 
+            is structured internally, not about when results are delivered 
+            to the caller. Both return the complete list of solutions.
 
     Returns:
         List[List[int]]: list of solutions, each a list of n column indices
