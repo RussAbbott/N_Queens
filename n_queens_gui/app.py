@@ -1,36 +1,39 @@
 import tkinter as tk
 from tkinter import messagebox
 from copy import copy
+from ortools.sat.python import cp_model
 
 
 def solve_n_queens(n, method="backtrack"):
-    board = [-1] * n
+    # queens[r] is the column of the queen in row r — the same role as the
+    # decision variable queens[r] in the CP version.
+    queens = [-1] * n
 
     def done(row):
         return row == n
 
     def is_safe(row, col):
         for r in range(row):
-            c = board[r]
+            c = queens[r]
             if c == col or abs(c - col) == abs(r - row):
                 return False
         return True
 
     # Tries every column for the current row; if safe, places a queen and
     # recurses to the next row. On reaching row n a complete solution has been
-    # found and a snapshot of board is appended to solutions. Undoing
-    # board[row] = -1 after the recursive call is the "backtrack" step that
+    # found and a snapshot of queens is appended to solutions. Undoing
+    # queens[row] = -1 after the recursive call is the "backtrack" step that
     # lets the loop continue trying other columns.
     def backtrack(row, solutions):
         if done(row):
             # backtrack() accumulates all solutions before returning any.
-            solutions.append(copy(board))
+            solutions.append(copy(queens))
         else:
             for col in range(n):
                 if is_safe(row, col):
-                    board[row] = col
+                    queens[row] = col
                     backtrack(row + 1, solutions)
-                    board[row] = -1
+                    queens[row] = -1
         return solutions
 
     # Same logic as backtrack, but instead of appending to an external list
@@ -42,19 +45,151 @@ def solve_n_queens(n, method="backtrack"):
     def generate(row):
         if done(row):
             # generate() yields each solution as it is found.
-            yield copy(board)
+            yield copy(queens)
         else:
             for col in range(n):
                 if is_safe(row, col):
-                    board[row] = col
+                    queens[row] = col
                     yield from generate(row + 1)
-                    board[row] = -1
+                    queens[row] = -1
 
     # generate(0) returns a lazy iterator; list() drives it to completion and
     # collects every yielded board snapshot into solutions all at once.
     # backtrack(0, []) builds and returns the list via its solutions parameter,
     # so both branches simply return their result directly.
-    solutions = backtrack(0, []) if method == 'backtrack' else list(generate(0))
+    if method == 'backtrack':
+        return backtrack(0, [])
+    elif method == 'generator':
+        return list(generate(0))
+    else:
+        raise ValueError(f"Unknown method: {method}")
+
+
+class Queen:
+    def __init__(self, domain):
+        self.avail_cols = frozenset(domain)
+
+    def constrain(self, col, row_distance):
+        # Return a new Queen with col and both diagonals at this row_distance removed.
+        return Queen(self.avail_cols - {col, col + row_distance, col - row_distance})
+
+
+def solve_n_queens_propagation(n):
+    solutions = []
+
+    def search(row, queens, assignment):
+        """
+        Given a partial assignment of cols to queens up through row - 1, finds all
+        valid completions of the given partial assignment and appends them to solutions.
+        The partial assignment is given by the three parameters.
+
+        Parameters:
+            row: int;
+                the first unassigned row.
+                All rows through row - 1 are assigned.
+
+            queens: List[Queen]
+                a list of Queen objects. Each queen's avail_cols has been pruned
+                to reflect the current partial assignment.
+                queens[i] is the Queen object for row i if not yet assigned; it is None
+                if row[i] is already assigned.
+
+            assignment: List[int]
+                the current partial assignment of columns to queens.
+                queens and assignment are parallel lists:
+                assignment[i] is -1 if row i is not yet assigned;  it is the
+                column assigned for row[i] if already assigned.
+
+                In other words:
+                -- queens[:row] are all None.;
+                -- assignment[:row] are the columns assigned to those queens;
+
+                -- queens[row] is the Queen being assigned;
+                -- assignment[row] is its assignment
+
+                -- queens[row+1:] are the Queens yet to be assigned;
+                -- assignment[row+1] are all -1 since they are unassigned.
+
+        Returns: None
+            The found solutions are appended to solutions, a nonlocal variable.
+
+        Operation
+            Since all cols in queen.avail_cols are currently valid, search iterates
+            through all of them. For each col, that column is assigned to the current
+            assignment by appending it to the assignment list.
+            search() also runs constrain() on the remaining unassigned queens to
+            remove col from their avail_cols.
+
+            If constrain() leaves a queen with an empty avail_cols, search() returns
+            immediately and backtracks.
+            On the other hand, if a queen has remaining avail_cols, search() recurses
+            to the next row with the updated partial assignment.
+
+            When row == n, an assignment has been completed. It is appended to solutions.
+        """
+        if row == n:
+            solutions.append(assignment[:])
+            return
+
+        # All the values in queens[row].avail_cols are  safe to try as columns.
+        for col in queens[row].avail_cols:
+            # queens up to but not including queens[row] have been assigned 
+            # and are None. They are irrelevant.
+            #
+            # queens[row] is the queen being assigned; it is set to None
+            # in new_queens, since after assignment, it too is irrelevant.
+            #
+            # queens[row+1:] are the queens yet to be assigned. They must
+            # be constrained by the assignment to queens[row]. Even though they
+            # are set in new_queens to be pointers to the same Queen objects 
+            # in queens, they will be replaced by new Queen objects when 
+            # constrain() is run on them.
+            new_queens = copy(queens)
+            new_queens[row] = None
+            for r in range(row + 1, n):
+                new_queens[r] = queens[r].constrain(col, r - row)
+                if len(new_queens[r].avail_cols) == 0:  # No available cols. Prune immediately
+                    break
+            else:
+                assignment[row] = col
+                search(row + 1, new_queens, assignment)
+
+    # Each Queen starts with every column available.
+    search(0, [Queen(range(n)) for _ in range(n)], [-1] * n)
+    return solutions
+
+
+def solve_n_queens_cp(n):
+    model = cp_model.CpModel()
+
+    # Each queens[r] is a decision variable representing the column of the queen
+    # in row r. Its avail_cols is 0..n-1 (any column is initially possible).
+    # The string "qr" is just a label used in solver diagnostics.
+    queens = [model.new_int_var(0, n - 1, f"q{r}") for r in range(n)]
+
+    # No two queens in the same column.
+    model.add_all_different(queens)
+
+    # No two queens on the same diagonal. Two queens at (r1,c1) and (r2,c2)
+    # share a diagonal when |c1-c2| == |r1-r2|, i.e. when c+r or c-r is equal.
+    # Requiring all col+row values to be distinct blocks one diagonal direction,
+    # and requiring all col-row values to be distinct blocks the other.
+    model.add_all_different([queens[r] + r for r in range(n)])
+    model.add_all_different([queens[r] - r for r in range(n)])
+
+    solver = cp_model.CpSolver()
+    solutions = []
+
+    # CpSolverSolutionCallback is an OR-Tools hook: the solver calls
+    # on_solution_callback() each time it finds a complete, valid assignment
+    # during its internal search. self.value() reads the current variable values
+    # at that moment (solver.value() can't be used here — the solve isn't done).
+    class SolutionCollector(cp_model.CpSolverSolutionCallback):
+        def on_solution_callback(self):
+            solutions.append([self.value(queens[r]) for r in range(n)])
+
+    solver.parameters.enumerate_all_solutions = True
+    solver.solve(model, SolutionCollector())
     return solutions
 
 
@@ -115,7 +250,7 @@ class NQueensApp(tk.Tk):
                  font=("Helvetica", 11),
                  bg=self.HEADER, fg="white").pack(side="left", padx=(12, 4))
         tk.OptionMenu(controls, self.method_var,
-                      "backtrack", "generator").pack(side="left")
+                      "backtrack", "generator", "cp", "propagation").pack(side="left")
 
     def _build_canvas(self):
         outer = tk.Frame(self, bg=self.BG)
@@ -196,7 +331,13 @@ class NQueensApp(tk.Tk):
 
         self._n        = n
         self.current   = 0
-        self.solutions = solve_n_queens(n, self.method_var.get())
+        method = self.method_var.get()
+        if method == "cp":
+            self.solutions = solve_n_queens_cp(n)
+        elif method == "propagation":
+            self.solutions = solve_n_queens_propagation(n)
+        else:
+            self.solutions = solve_n_queens(n, method)
 
         if not self.solutions:
             self._draw_board_only(n)
