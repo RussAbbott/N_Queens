@@ -7,7 +7,7 @@ from ortools.sat.python import cp_model
 def solve_n_queens(n, method="recursion"):
     """
     Find all solutions to the N-Queens problem using recursion or 
-    generator via for .. yield.  
+    a generator via for .. yield.  
 
     Parameters:
         n: int
@@ -23,27 +23,50 @@ def solve_n_queens(n, method="recursion"):
         List[List[int]]: list of solutions, each a list of n column indices
         where solution[r] is the column of the queen in row r.
     """
-    # queens[r] will be the column of the queen in row r.
+    # queens[r] will be the column number of the queen in row r.
     queens = [None] * n
+
+    # In the recursion method, solutions are accumulated in the solutions
+    # list as a side effect of exhausting the generator.
+    solutions = []
 
     def is_done(row):
         return row == n
 
     def is_safe(row, col):
+        # Check whether placing a queen at (row, col) is safe given the current
+        # partial assignment in queens. We need to check only rows [0 .. row-1],
+        # since these are the only rows that have been assigned so far.
         for r in range(row):
             c = queens[r]
             if c == col or abs(c - col) == abs(r - row):
                 return False
         return True
 
-    solutions = []
-
+    # The function rec_gen(row)() does all the work. Because it includes a yield
+    # statement, Python categorizes it as a generator. But it can be used in two ways. 
+    # The line "yield from rec_gen(row + 1)" does double duty. 
+    #
+    # o In recursive mode, rec_gen() fills the pre-defined solutions list as solutions 
+    # are found. "yield from rec_gen(row + 1)" is the recursive call. All possibilities 
+    # are explored through recursion. The complete list of solutions is returned to the 
+    # original caller when rec_gen() terminates.
+    #
+    # o In generator mode, rec_gen() yields solutions to the original caller as they 
+    # are found. "yield from rec_gen(row + 1)" propagates yielded solutions upward. 
+    # The original caller accumulates those solutions in its own dynamically
+    # constructed list. As above, all possibilities are explored through recursion.
     def rec_gen(row):
         if is_done(row):
-            # When using recursion, it accumulates all solutions before returning any.
+            # When using recursion, all solutions are accumulated
+            # before any are returned.
             if method == 'recursion':
                 solutions.append(copy(queens))
-            else: # method == 'generator':
+            else: 
+                # When using the generator functionality, each solution is yielded 
+                # when found. The original caller accumulates them in its own list.
+                # The search is still exhaustive, but results could be processed one 
+                # at a time if desired.
                 yield copy(queens)
         else:
             for col in range(n):
@@ -51,16 +74,18 @@ def solve_n_queens(n, method="recursion"):
                     queens[row] = col
                     yield from rec_gen(row + 1)
 
+    # Get the iterator defined by rec_gen(). The search doesn't start until we query 
+    # the iterator.
     rec_gen_iterator = rec_gen(0)
+
     if method == 'recursion':
-        # Since rec_gen is a generator, it returns an iterator. 
-        # list() exhausts the iterator, which, as a side effect(!)
-        # fills solutions. 
+        # list() exhausts rec_gen_iterator. As a side effect(!), the solutions 
+        # list is filled.
         list(rec_gen_iterator)
         return solutions
     else: # method == 'generator':
-        # In this branch, we simply run the iterator and collect 
-        # and return the results directly.
+        # In generator mode, we run the iterator, collect the results 
+        # in a dynamically created list, and return that list. 
         return list(rec_gen_iterator)
 
 
