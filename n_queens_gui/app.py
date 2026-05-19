@@ -4,15 +4,16 @@ from copy import copy
 from ortools.sat.python import cp_model
 
 
-def solve_n_queens(n, method="backtrack"):
+def solve_n_queens(n, method="recursion"):
     """
-    Find all solutions to the N-Queens problem using backtracking.
+    Find all solutions to the N-Queens problem using recursion or 
+    generator via for .. yield.  
 
     Parameters:
         n: int
             Number of queens (and board size).
         method: str
-            "backtrack" to accumulate solutions via explicit undo steps;
+            "recursion" to accumulate solutions via explicit undo steps;
             "generator" to find solutions via a Python generator internally.
             The difference between the two methods is about how the search 
             is structured internally, not about when results are delivered 
@@ -22,11 +23,10 @@ def solve_n_queens(n, method="backtrack"):
         List[List[int]]: list of solutions, each a list of n column indices
         where solution[r] is the column of the queen in row r.
     """
-    # queens[r] is the column of the queen in row r — the same role as the
-    # decision variable queens[r] in the CP version.
-    queens = [-1] * n
+    # queens[r] will be the column of the queen in row r.
+    queens = [None] * n
 
-    def done(row):
+    def is_done(row):
         return row == n
 
     def is_safe(row, col):
@@ -36,50 +36,32 @@ def solve_n_queens(n, method="backtrack"):
                 return False
         return True
 
-    # Tries every column for the current row; if safe, places a queen and
-    # recurses to the next row. On reaching row n a complete solution has been
-    # found and a snapshot of queens is appended to solutions. Undoing
-    # queens[row] = -1 after the recursive call is the "backtrack" step that
-    # lets the loop continue trying other columns.
-    def backtrack(row, solutions):
-        if done(row):
-            # backtrack() accumulates all solutions before returning any.
-            solutions.append(copy(queens))
+    solutions = []
+
+    def rec_gen(row):
+        if is_done(row):
+            # When using recursion, it accumulates all solutions before returning any.
+            if method == 'recursion':
+                solutions.append(copy(queens))
+            else: # method == 'generator':
+                yield copy(queens)
         else:
             for col in range(n):
                 if is_safe(row, col):
                     queens[row] = col
-                    backtrack(row + 1, solutions)
-                    queens[row] = -1
+                    yield from rec_gen(row + 1)
+
+    rec_gen_iterator = rec_gen(0)
+    if method == 'recursion':
+        # Since rec_gen is a generator, it returns an iterator. 
+        # list() exhausts the iterator, which, as a side effect(!)
+        # fills solutions. 
+        list(rec_gen_iterator)
         return solutions
-
-    # Same logic as backtrack, but instead of appending to an external list
-    # it yields each solution directly to the caller. The presence of yield
-    # makes this a generator function: calling generate(row) returns a lazy
-    # iterator rather than running any code immediately. yield from delegates
-    # to the recursive sub-iterator, propagating each yielded value up the
-    # call stack without buffering.
-    def generate(row):
-        if done(row):
-            # generate() yields each solution as it is found.
-            yield copy(queens)
-        else:
-            for col in range(n):
-                if is_safe(row, col):
-                    queens[row] = col
-                    yield from generate(row + 1)
-                    queens[row] = -1
-
-    # generate(0) returns a lazy iterator; list() drives it to completion and
-    # collects every yielded board snapshot into solutions all at once.
-    # backtrack(0, []) builds and returns the list via its solutions parameter,
-    # so both branches simply return their result directly.
-    if method == 'backtrack':
-        return backtrack(0, [])
-    elif method == 'generator':
-        return list(generate(0))
-    else:
-        raise ValueError(f"Unknown method: {method}")
+    else: # method == 'generator':
+        # In this branch, we simply run the iterator and collect 
+        # and return the results directly.
+        return list(rec_gen_iterator)
 
 
 class Queen:
@@ -97,7 +79,7 @@ def solve_n_queens_propagation(n):
 
     Each queen is represented as a Queen object whose avail_cols is pruned
     as columns are assigned. New Queen objects are created on each recursive
-    call rather than mutating in place, so backtracking requires no undo step.
+    call rather than mutating in place, so recursion requires no undo step.
 
     Parameters:
         n: int
@@ -153,7 +135,7 @@ def solve_n_queens_propagation(n):
             remove col from their avail_cols.
 
             If constrain() leaves a queen with an empty avail_cols, search() returns
-            immediately and backtracks.
+            immediately and recurses.
             On the other hand, if a queen has remaining avail_cols, search() recurses
             to the next row with the updated partial assignment.
 
@@ -254,7 +236,7 @@ class NQueensApp(tk.Tk):
         self.solutions  = []
         self.current    = 0
         self._n         = 8
-        self.method_var = tk.StringVar(value="backtrack")
+        self.method_var = tk.StringVar(value="recursion")
         self._build_ui()
         self._draw_board_only(8)
 
@@ -296,7 +278,7 @@ class NQueensApp(tk.Tk):
                  font=("Helvetica", 11),
                  bg=self.HEADER, fg="white").pack(side="left", padx=(12, 4))
         tk.OptionMenu(controls, self.method_var,
-                      "backtrack", "generator", "cp", "propagation").pack(side="left")
+                      "recursion", "generator", "cp", "propagation").pack(side="left")
 
     def _build_canvas(self):
         outer = tk.Frame(self, bg=self.BG)
