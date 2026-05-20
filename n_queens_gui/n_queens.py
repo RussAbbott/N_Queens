@@ -89,7 +89,7 @@ def solve_n_queens(n, method="recursion"):
     # The complete list of solutions is returned in either case.
 
     # Step 1. Generate and exhaust the iterator returned by rec_gen(0). 
-    # In recursion mode is, this has the side effect of filling the pre-defined 
+    # In recursion mode, this has the side effect of building the pre-defined 
     # solutions list.
     # In generator mode, this collects the yielded solutions as yielded_solutions.
     yielded_solutions = list(rec_gen(0))
