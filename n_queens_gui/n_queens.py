@@ -155,14 +155,14 @@ def solve_n_queens_propagation(n):
         # All the values in queens[row].avail_cols are safe to try as columns.
         for col in queens[row].avail_cols:
             new_queens = copy(queens)
-            # Record the assignment in the Queen object itself.
-            new_queens[row] = queens[row].assign(col)
             for r in range(row + 1, n):
                 new_queens[r] = queens[r].constrain(col, r - row)
                 # If no available cols after constraining, prune immediately.
                 if len(new_queens[r].avail_cols) == 0:
                     break
             else:
+                # Record the assignment only when all constraints are satisfied.
+                new_queens[row] = queens[row].assign(col)
                 search(row + 1, new_queens)
 
     # Each Queen starts with every column available.
