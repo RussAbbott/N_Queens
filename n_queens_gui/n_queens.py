@@ -99,8 +99,13 @@ def solve_n_queens(n, method="recursion"):
 
 
 class Queen:
-    def __init__(self, domain):
+    def __init__(self, domain, assigned_col=None):
         self.avail_cols = frozenset(domain)
+        self.assigned_col = assigned_col
+
+    def assign(self, col):
+        # Return a new Queen with col assigned and no remaining available columns.
+        return Queen([], col)
 
     def constrain(self, col, row_distance):
         # Return a new Queen with col and both diagonals at this row_distance removed.
@@ -125,85 +130,43 @@ def solve_n_queens_propagation(n):
     """
     solutions = []
 
-    def search(row, queens, assignment):
+    def search(row, queens):
         """
         Given a partial assignment of cols to queens up through row - 1, finds all
-        valid completions of the given partial assignment and appends them to solutions.
-        The partial assignment is given by the three parameters.
+        valid completions and appends them to solutions.
 
         Parameters:
-            row: int;
-                the first unassigned row.
-                All rows through row - 1 are assigned.
+            row: int
+                The first unassigned row. All rows through row - 1 are assigned.
 
             queens: List[Queen]
-                a list of Queen objects. Each queen's avail_cols has been pruned
-                to reflect the current partial assignment.
-                queens[i] is the Queen object for row i if not yet assigned; it is None
-                if row[i] is already assigned.
-
-            assignment: List[int]
-                the current partial assignment of columns to queens.
-                queens and assignment are parallel lists:
-                assignment[i] is -1 if row i is not yet assigned;  it is the
-                column assigned for row[i] if already assigned.
-
-                In other words:
-                -- queens[:row] are all None.;
-                -- assignment[:row] are the columns assigned to those queens;
-
-                -- queens[row] is the Queen being assigned;
-                -- assignment[row] is its assignment
-
-                -- queens[row+1:] are the Queens yet to be assigned;
-                -- assignment[row+1] are all -1 since they are unassigned.
+                queens[r].assigned_col holds the assigned column for r < row.
+                queens[row] is the Queen being assigned (avail_cols is non-empty).
+                queens[r] for r > row are Queens yet to be assigned, with avail_cols
+                pruned to reflect the current partial assignment.
 
         Returns: None
-            The found solutions are appended to solutions, a nonlocal variable.
-
-        Operation
-            Since all cols in queen.avail_cols are currently valid, search iterates
-            through all of them. For each col, that column is assigned to the current
-            assignment by appending it to the assignment list.
-            search() also runs constrain() on the remaining unassigned queens to
-            remove col from their avail_cols.
-
-            If constrain() leaves a queen with an empty avail_cols, search() returns
-            immediately and recurses.
-            On the other hand, if a queen has remaining avail_cols, search() recurses
-            to the next row with the updated partial assignment.
-
-            When row == n, an assignment has been completed. It is appended to solutions.
+            Found solutions are appended to solutions, a nonlocal variable.
         """
         if row == n:
-            solutions.append(assignment[:])
+            solutions.append([q.assigned_col for q in queens])
             return
 
-        # All the values in queens[row].avail_cols are  safe to try as columns.
+        # All the values in queens[row].avail_cols are safe to try as columns.
         for col in queens[row].avail_cols:
-            # queens up to but not including queens[row] have been assigned 
-            # and are None. They are irrelevant.
-            #
-            # queens[row] is the queen being assigned; it is set to None
-            # in new_queens, since after assignment, it too is irrelevant.
-            #
-            # queens[row+1:] are the queens yet to be assigned. They must
-            # be constrained by the assignment to queens[row]. Even though they
-            # are set in new_queens to be pointers to the same Queen objects 
-            # in queens, they will be replaced by new Queen objects when 
-            # constrain() is run on them.
             new_queens = copy(queens)
-            new_queens[row] = None
+            # Record the assignment in the Queen object itself.
+            new_queens[row] = queens[row].assign(col)
             for r in range(row + 1, n):
                 new_queens[r] = queens[r].constrain(col, r - row)
-                if len(new_queens[r].avail_cols) == 0:  # No available cols. Prune immediately
+                # If no available cols after constraining, prune immediately.
+                if len(new_queens[r].avail_cols) == 0:
                     break
             else:
-                assignment[row] = col
-                search(row + 1, new_queens, assignment)
+                search(row + 1, new_queens)
 
     # Each Queen starts with every column available.
-    search(0, [Queen(range(n)) for _ in range(n)], [-1] * n)
+    search(0, [Queen(range(n)) for _ in range(n)])
     return solutions
 
 
