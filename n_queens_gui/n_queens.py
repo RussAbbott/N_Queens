@@ -103,10 +103,6 @@ class Queen:
         self.avail_cols = frozenset(domain)
         self.assigned_col = assigned_col
 
-    def assign(self, col):
-        # Return a new Queen with col assigned and no remaining available columns.
-        return Queen([], col)
-
     def constrain(self, col, row_distance):
         # Return a new Queen with col and both diagonals at this row_distance removed.
         return Queen(self.avail_cols - {col, col + row_distance, col - row_distance})
@@ -161,8 +157,9 @@ def solve_n_queens_propagation(n):
                 if len(new_queens[r].avail_cols) == 0:
                     break
             else:
-                # Record the assignment only when all constraints are satisfied.
-                new_queens[row] = queens[row].assign(col)
+                # When all constraints are satisfied, record the assignment by 
+                # creating a new Queen object with that value as its assigned_col.
+                new_queens[row] = Queen([], col) 
                 search(row + 1, new_queens)
 
     # Each Queen starts with every column available.
@@ -174,8 +171,24 @@ def solve_n_queens_cp(n):
     """
     Find all solutions to the N-Queens problem using the OR-Tools CP-SAT solver.
 
-    Models each row's queen column as an integer decision variable, then adds
-    all-different constraints for columns and both diagonal directions.
+    A problem specification, called a Model, consists of decision variables and 
+    constraints. A decision variable is a variable that can take on values from 
+    a specified domain. A constraint is a relation among decision variables that 
+    must hold.
+    
+    For this problem, n decision variables represent the positions of n queens.
+    These are stored in the list queens, where queens[r] is the column of the 
+    queen in row r as in the previous solutions.
+    
+    In this problem, the only constraint type is all_different(List), which
+    requires that all decisions variables in the list assume distinct values.
+    For example, all_different(queens) requires that all the queens be different.
+    
+    Given a problem specification, the solver uses constraint programming 
+    techniques to search the solution space for valid assignments.
+   
+    The implementation below is straightforward, but the library offers many 
+    knobs to turn for performance tuning.
 
     Parameters:
         n: int
@@ -188,8 +201,8 @@ def solve_n_queens_cp(n):
     model = cp_model.CpModel()
 
     # Each queens[r] is a decision variable representing the column of the queen
-    # in row r. Its avail_cols is 0..n-1 (any column is initially possible).
-    # The string "qr" is just a label used in solver diagnostics.
+    # in row r. Its domain is 0..n-1. The string "qr" is a label used in solver 
+    # diagnostics.
     queens = [model.new_int_var(0, n - 1, f"q{r}") for r in range(n)]
 
     # No two queens in the same column.
@@ -204,16 +217,21 @@ def solve_n_queens_cp(n):
 
     solver = cp_model.CpSolver()
     solutions = []
+    solver.parameters.enumerate_all_solutions = True
 
-    # CpSolverSolutionCallback is an OR-Tools hook: the solver calls
-    # on_solution_callback() each time it finds a complete, valid assignment
-    # during its internal search. self.value() reads the current variable values
-    # at that moment (solver.value() can't be used here — the solve isn't done).
+    # CpSolverSolutionCallback is an OR-Tools class whose instances are expected
+    # to implement the on_solution_callback() method--which is called whenever a
+    # solution is found. Such an instance has access to the values of the decision 
+    # variables via the value() method. Those values are the found solution, i.e., 
+    # they satisfy the specified  constraints. 
+    # 
+    # Our SolutionCollector is a subclass of CpSolverSolutionCallback. Its
+    # on_solution_callback() method adds each found solution to the list of 
+    # solutions.
     class SolutionCollector(cp_model.CpSolverSolutionCallback):
         def on_solution_callback(self):
             solutions.append([self.value(queens[r]) for r in range(n)])
 
-    solver.parameters.enumerate_all_solutions = True
     solver.solve(model, SolutionCollector())
     return solutions
 
