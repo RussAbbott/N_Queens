@@ -6,22 +6,25 @@ from ortools.sat.python import cp_model
 
 def solve_n_queens(n, method="recursion"):
     """
-    Find all solutions to the N-Queens problem using recursion or 
-    a generator via for .. yield.  
+    Find all solutions to the N-Queens problem using either standard recursion 
+    or a for/yield-style generator.  
 
     Parameters:
         n: int
             Number of queens (and board size).
         method: str
-            "recursion" to accumulate solutions via explicit undo steps;
-            "generator" to find solutions via a Python generator internally.
-            The difference between the two methods is about how the search 
-            is structured internally, not about when results are delivered 
-            to the caller. Both return the complete list of solutions.
+            - "recursion" accumulate solutions as a side-effect of exhausting 
+              rec_gen(), a generator. Return those collected solutions.
+            - "generator" find and yield solutions via rec_gen(). The rec_gen() 
+              caller collects and returns the yielded solutions.
+
+            In both cases, the space of possible solutions is explored through 
+            the same recursive process.  
 
     Returns:
-        List[List[int]]: list of solutions, each a list of n column indices
-        where solution[r] is the column of the queen in row r.
+        List[List[int]]: a list of solutions, each solution is a list of 
+        n column indices, where solution[r] (= solutions[i][r]) is the 
+        column of the queen in row r.
     """
     # queens[r] will be the column number of the queen in row r.
     queens = [None] * n
@@ -74,19 +77,25 @@ def solve_n_queens(n, method="recursion"):
                     queens[row] = col
                     yield from rec_gen(row + 1)
 
-    # Get the iterator defined by rec_gen(). The search doesn't start until we query 
-    # the iterator.
-    rec_gen_iterator = rec_gen(0)
+    # solve_n_queens() is called by the UI whenever method is either recursion or 
+    # generator.
 
-    if method == 'recursion':
-        # list() exhausts rec_gen_iterator. As a side effect(!), the solutions 
-        # list is filled.
-        list(rec_gen_iterator)
-        return solutions
-    else: # method == 'generator':
-        # In generator mode, we run the iterator, collect the results 
-        # in a dynamically created list, and return that list. 
-        return list(rec_gen_iterator)
+    # If method is recursion, rec_gen() fills the pre-defined solutions list as a
+    # side effect of its execution. solutions is returned when rec_gen() terminates. 
+    # 
+    # If method is generator, rec_gen() yields solutions as they are found. The code 
+    # below uses list() to collect those solutions into a list, which is returned.
+
+    # The complete list of solutions is returned in either case.
+
+    # Step 1. Generate and exhaust the iterator returned by rec_gen(0). 
+    # In recursion mode is, this has the side effect of filling the pre-defined 
+    # solutions list.
+    # In generator mode, this collects the yielded solutions as yielded_solutions.
+    yielded_solutions = list(rec_gen(0))
+
+    # Step 2. Return either solutions or yielded_solutions
+    return solutions if method == 'recursion' else yielded_solutions
 
 
 class Queen:
