@@ -5,11 +5,11 @@ from ortools.sat.python import cp_model
 
 
 #  ---------------------------------------------------------------------------------
-# SECTION: solve_n_queens_search_rec_gen using either recursion or a generator.
+# SECTION: solve_n_queens using either recursion or a generator.
 # The recursive process is the same in either case, but the way solutions are
 # collected and returned differs.
 
-def solve_n_queens_search_rec_gen(n, method="recursion"):
+def solve_n_queens_rec_gen(n, method="recursion"):
     """
     Find all solutions to the N-Queens problem using either standard recursion 
     or a for/yield-style generator.  
@@ -82,7 +82,7 @@ def solve_n_queens_search_rec_gen(n, method="recursion"):
                     queens[row] = col
                     yield from search_rec_gen(row + 1)
 
-    # solve_n_queens_search_rec_gen() is called by the UI whenever method is either recursion or
+    # solve_n_queens_rec_gen() is called by the UI whenever method is either recursion or
     # generator.
 
     # If method is recursion, search_rec_gen() fills the pre-defined solutions list as a
@@ -102,7 +102,7 @@ def solve_n_queens_search_rec_gen(n, method="recursion"):
     # Step 2. Return either solutions or yielded_solutions
     return solutions if method == 'recursion' else yielded_solutions
 
-#  END: solve_n_queens_search_rec_gen using either recursion or a generator.
+#  END: solve_n_queens using either recursion or a generator.
 #  ---------------------------------------------------------------------------------
 
 
@@ -399,7 +399,7 @@ class NQueensApp(tk.Tk):
         elif method == "propagation":
             self.solutions = solve_n_queens_propagation(n)
         else:
-            self.solutions = solve_n_queens_search_rec_gen(n, method)
+            self.solutions = solve_n_queens_rec_gen(n, method)
 
         if not self.solutions:
             self._draw_board_only(n)
