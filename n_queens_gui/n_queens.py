@@ -160,18 +160,25 @@ def solve_n_queens_propagation(n):
         # constrained Queen first.
         most_constrained_queen = min((unassigned_queens), key=lambda q: len(q.avail_cols))
 
+        def constrain_all(queens, col, pivot_row):
+            # Apply col assignment to all queens, returning None on the first failure.
+            result = set()
+            for q in queens:
+                constrained = q.constrain(col, abs(pivot_row - q.row))
+                if not constrained.avail_cols:
+                    return None
+                result.add(constrained)
+            return result
+
         # All the avail_cols in most_constrained_queen are safe to try as a column.
         for col in most_constrained_queen.avail_cols:
-            new_unassigned_queens = {q.constrain(col, abs(most_constrained_queen.row - q.row))
-                                     for q in (unassigned_queens - {most_constrained_queen})}
-            # If assigning col eliminates all rows for some unassigned queen, don't use it.
-            if any(len(q.avail_cols) == 0 for q in new_unassigned_queens):
-                continue
-
-            # col can be assigned to most_constrained_queen. Update assigned_queens and recurse
-            new_assigned_queens = assigned_queens | {Queen(most_constrained_queen.row, frozenset(), col)}
-    
-            search(new_unassigned_queens, new_assigned_queens)
+            new_unassigned_queens = constrain_all(
+                unassigned_queens - {most_constrained_queen},
+                col, most_constrained_queen.row)
+            if new_unassigned_queens is not None:
+                new_assigned_queens = assigned_queens | \
+                                      {Queen(most_constrained_queen.row, assigned_col=col)}
+                search(new_unassigned_queens, new_assigned_queens)
 
     # Since the board is square, domain is the set of all indices for both rows and columns. 
     domain = frozenset(range(n))
