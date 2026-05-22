@@ -97,15 +97,23 @@ def solve_n_queens(n, method="recursion"):
     # Step 2. Return either solutions or yielded_solutions
     return solutions if method == 'recursion' else yielded_solutions
 
+#  End of the combined recursion/generator solutions. 
+
 
 class Queen:
-    def __init__(self, domain, assigned_col=None):
-        self.avail_cols = frozenset(domain)
+    # Since the Queens are kept in a set, each needs a row instance variable to idenitfy it. 
+    # Each also has an avail_cols instance variable, which is a frozenset of the available columns.
+    # Eventually, each Queen will have an assigned column, stored in the assigned_col 
+    # instance variable. self.assigned_col is None until the column is assigned.
+    def __init__(self, row, avail_cols=frozenset(), assigned_col=None):
+        self.row = row
+        self.avail_cols = avail_cols
         self.assigned_col = assigned_col
 
-    def constrain(self, col, row_distance):
-        # Return a new Queen with col and both diagonals at this row_distance removed.
-        return Queen(self.avail_cols - {col, col + row_distance, col - row_distance})
+    def constrain(self, col, row_dist):
+        # Return a new Queen for self.row with col and both diagonals at this 
+        # row_distance removed.
+        return Queen(self.row, self.avail_cols - {col, col + row_dist, col - row_dist})
 
 
 def solve_n_queens_propagation(n):
@@ -114,7 +122,7 @@ def solve_n_queens_propagation(n):
 
     Each queen is represented as a Queen object whose avail_cols is pruned
     as columns are assigned. New Queen objects are created on each recursive
-    call rather than mutating in place, so recursion requires no undo step.
+    call rather than mutating in place, so no undo step is required.
 
     Parameters:
         n: int
@@ -126,44 +134,51 @@ def solve_n_queens_propagation(n):
     """
     solutions = []
 
-    def search(row, queens):
+    def search(unassigned_queens, assigned_queens):
         """
         Given a partial assignment of cols to queens up through row - 1, finds all
         valid completions and appends them to solutions.
 
         Parameters:
-            row: int
-                The first unassigned row. All rows through row - 1 are assigned.
-
-            queens: List[Queen]
-                queens[r].assigned_col holds the assigned column for r < row.
-                queens[row] is the Queen being assigned (avail_cols is non-empty).
-                queens[r] for r > row are Queens yet to be assigned, with avail_cols
-                pruned to reflect the current partial assignment.
+            unassigned_queens: Set[Queen]. 
+                Queens that are not yet assigned a column. Each has a non-empty avail_cols.
+            assigned_queens: Set[Queen]. 
+                Queens that have been assigned a column: assigned_col is not null.
 
         Returns: None
             Found solutions are appended to solutions, a nonlocal variable.
         """
-        if row == n:
-            solutions.append([q.assigned_col for q in queens])
+
+        if len(unassigned_queens) == 0:
+            # All queens are assigned. Extract the solution and append it to solutions. 
+            sorted_queens = sorted(assigned_queens, key=lambda q: q.row)
+            solutions.append([q.assigned_col for q in sorted_queens])
             return
+        
+        # Find the Queens with the fewest available columns. 
+        # This heuristic generally shortens the search time by focusing on the most 
+        # constrained Queen first.
+        most_constrained_queen = min((unassigned_queens), key=lambda q: len(q.avail_cols))
 
-        # All the values in queens[row].avail_cols are safe to try as columns.
-        for col in queens[row].avail_cols:
-            new_queens = copy(queens)
-            for r in range(row + 1, n):
-                new_queens[r] = queens[r].constrain(col, r - row)
-                # If no available cols after constraining, prune immediately.
-                if len(new_queens[r].avail_cols) == 0:
-                    break
-            else:
-                # When all constraints are satisfied, record the assignment by 
-                # creating a new Queen object with that value as its assigned_col.
-                new_queens[row] = Queen([], col) 
-                search(row + 1, new_queens)
+        # All the avail_cols in most_constrained_queen are safe to try as a column.
+        for col in most_constrained_queen.avail_cols:
+            new_unassigned_queens = {q.constrain(col, abs(most_constrained_queen.row - q.row))
+                                     for q in (unassigned_queens - {most_constrained_queen})}
+            # If assigning col eliminates all rows for some unassigned queen, don't use it.
+            if any(len(q.avail_cols) == 0 for q in new_unassigned_queens):
+                continue
 
-    # Each Queen starts with every column available.
-    search(0, [Queen(range(n)) for _ in range(n)])
+            # col can be assigned to most_constrained_queen. Update assigned_queens and recurse
+            new_assigned_queens = assigned_queens | {Queen(most_constrained_queen.row, frozenset(), col)}
+    
+            search(new_unassigned_queens, new_assigned_queens)
+
+    # Since the board is square, domain is the set of all indices for both rows and columns. 
+    domain = frozenset(range(n))
+    # Create an initial set of Queens, one for each row. Each has every column available.
+    unassigned_queens = {Queen(row, avail_cols=domain) for row in domain}
+    assigned_queens = set()
+    search(unassigned_queens, assigned_queens)
     return solutions
 
 
