@@ -73,8 +73,9 @@ def solve_n_queens_propagation(n, method="recursion", strategy="mrv"):
     # In recursion mode, solutions are accumulated here as a side effect.
     solutions = []
 
-    # search_propagation() is a generator function (it contains yield/yield from).
-    # The yield from on the recursive call drives the exhaustive search in both modes.
+    # search_propagation() is a generator function--it contains yield and 
+    # yield from. The yield from on the recursive call drives the exhaustive 
+    # search in both modes.
     #
     # o recursion mode: the base case appends to solutions; yield from recurses.
     #   No solution is ever yielded upward, but the recursive structure is fully
@@ -93,17 +94,17 @@ def solve_n_queens_propagation(n, method="recursion", strategy="mrv"):
                 yield solution
         else:
             # Choose the next queen according to the selected strategy.
-            if strategy == "inorder":
-                next_queen = min(unassigned_queens, key=lambda q: q.row)
-            else:  # "mrv": pick the queen with the fewest remaining columns
-                next_queen = min(unassigned_queens, key=lambda q: len(q.avail_cols))
+            key_fn = (lambda q: q.row) if strategy == "inorder" else \
+                     (lambda q: len(q.avail_cols))
+            next_queen = min(unassigned_queens, key=key_fn)
+
             for col in next_queen.avail_cols:
-                new_unassigned = constrain_all(
-                    unassigned_queens - {next_queen},
-                    col, next_queen.row)
+                new_unassigned = constrain_all(unassigned_queens - {next_queen},
+                                               col, 
+                                               next_queen.row)
                 if new_unassigned is not None:
-                    new_assigned = assigned_queens | {
-                        Queen(next_queen.row, assigned_col=col)}
+                    new_assigned = (assigned_queens | 
+                                    {Queen(next_queen.row, assigned_col=col)})
                     yield from search_propagation(new_unassigned, new_assigned)
 
     domain = frozenset(range(n))
