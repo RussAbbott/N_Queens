@@ -1,13 +1,13 @@
-import tkinter as tk
-from tkinter import messagebox
 from copy import copy
 from ortools.sat.python import cp_model
+import tkinter as tk
+from tkinter import messagebox
 
 
 #  ---------------------------------------------------------------------------------
-# SECTION: solve_n_queens using either recursion or a generator.
-# The recursive process is the same in either case, but the way solutions are
-# collected and returned differs.
+# SECTION: solve n-queens using either recursion or a generator.
+# The recursive search process is the same in both case, but the way 
+# solutions are collected and returned differs.
 
 def solve_n_queens_rec_gen(n, method="recursion"):
     """
@@ -109,7 +109,7 @@ def solve_n_queens_rec_gen(n, method="recursion"):
 #  ---------------------------------------------------------------------------------
 # SECTION: solve_n_queens using domain propagation with the MRV heuristic.
 
-def solve_n_queens_propagation(n):
+def solve_n_queens_propagation(n, method="recursion"):
     """
     Find all solutions to the N-Queens problem using domain propagation with
     the MRV (Minimum Remaining Values) heuristic.
@@ -118,9 +118,25 @@ def solve_n_queens_propagation(n):
     as columns are assigned. New Queen objects are created on each recursive
     call rather than mutating in place, so no undo step is required.
 
+    Like solve_n_queens_rec_gen, this function supports two identical search
+    processes packaged in two different styles:
+
+        method="recursion"  search_propagation() is a generator whose
+                            yield-from calls drive exhaustive recursion;
+                            solutions are accumulated as a side effect in
+                            the pre-defined solutions list and returned when
+                            the generator is fully exhausted.
+
+        method="generator"  search_propagation() yields each solution as it
+                            is found and propagates them upward via yield from.
+                            The caller collects them with list() and returns
+                            that list.
+
     Parameters:
         n: int
             Number of queens (and board size).
+        method: str
+            "recursion" or "generator" (default "recursion").
 
     Returns:
         List[List[int]]: list of solutions, each a list of n column indices
@@ -149,27 +165,43 @@ def solve_n_queens_propagation(n):
             constrained_queens.add(constrained)
         return constrained_queens
 
+    # In recursion mode, solutions are accumulated here as a side effect.
+    solutions = []
+
+    # search_propagation() is a generator function (it contains yield/yield from).
+    # The yield from on the recursive call drives the exhaustive search in both modes.
+    #
+    # o recursion mode: the base case appends to solutions; yield from recurses.
+    #   No solution is ever yielded upward, but the recursive structure is fully
+    #   explored as a side effect of exhausting the top-level generator.
+    #
+    # o generator mode: the base case yields the solution upward; yield from
+    #   propagates it all the way to the list() call at the top level.
     def search_propagation(unassigned_queens, assigned_queens):
-        # Return all valid completions of the partial assignment.
         if not unassigned_queens:
+            # Base case: every queen has been assigned — record the solution.
             sorted_queens = sorted(assigned_queens, key=lambda q: q.row)
-            return [[q.assigned_col for q in sorted_queens]]
-
-        # MRV heuristic: assign the most constrained queen first.
-        most_constrained_queen = min(unassigned_queens, key=lambda q: len(q.avail_cols))
-
-        solutions = []
-        for col in most_constrained_queen.avail_cols:
-            new_unassigned = constrain_all(
-                unassigned_queens - {most_constrained_queen},
-                col, most_constrained_queen.row)
-            if new_unassigned is not None:
-                new_assigned = assigned_queens | {Queen(most_constrained_queen.row, assigned_col=col)}
-                solutions.extend(search_propagation(new_unassigned, new_assigned))
-        return solutions
+            solution = [q.assigned_col for q in sorted_queens]
+            if method == "recursion":
+                solutions.append(solution)
+            else:
+                yield solution
+        else:
+            # MRV heuristic: assign the most constrained queen first.
+            most_constrained_queen = min(unassigned_queens, key=lambda q: len(q.avail_cols))
+            for col in most_constrained_queen.avail_cols:
+                new_unassigned = constrain_all(
+                    unassigned_queens - {most_constrained_queen},
+                    col, most_constrained_queen.row)
+                if new_unassigned is not None:
+                    new_assigned = assigned_queens | {
+                        Queen(most_constrained_queen.row, assigned_col=col)}
+                    yield from search_propagation(new_unassigned, new_assigned)
 
     domain = frozenset(range(n))
-    return search_propagation({Queen(row, avail_cols=domain) for row in domain}, set())
+    yielded_solutions = list(
+        search_propagation({Queen(row, avail_cols=domain) for row in domain}, set()))
+    return solutions if method == "recursion" else yielded_solutions
 
 # END: solve_n_queens using domain propagation with the MRV heuristic.
 # ---------------------------------------------------------------------------------
@@ -309,9 +341,11 @@ class NQueensApp(tk.Tk):
                  font=("Helvetica", 11),
                  bg=self.HEADER, fg="white").pack(side="left", padx=(12, 4))
         method_menu = tk.OptionMenu(controls, self.method_var,
-                                    "recursion", "generator", "propagation", "cp")
+                                    "recursion", "generator",
+                                    "prop-recursion", "prop-generator",
+                                    "cp")
         method_menu["menu"].insert_separator(2)  # after generator
-        method_menu["menu"].insert_separator(4)  # after propagation
+        method_menu["menu"].insert_separator(5)  # after prop-generator
         method_menu.pack(side="left")
 
     def _build_canvas(self):
@@ -396,8 +430,9 @@ class NQueensApp(tk.Tk):
         method = self.method_var.get()
         if method == "cp":
             self.solutions = solve_n_queens_cp(n)
-        elif method == "propagation":
-            self.solutions = solve_n_queens_propagation(n)
+        elif method.startswith("prop"):
+            prop_method = "recursion" if method == "prop-recursion" else "generator"
+            self.solutions = solve_n_queens_propagation(n, prop_method)
         else:
             self.solutions = solve_n_queens_rec_gen(n, method)
 
