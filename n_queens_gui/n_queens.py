@@ -1,3 +1,23 @@
+# ── N-Queens Solver ────────────────────────────────────────────────────────────
+#
+# This file has two sections:
+#
+#   1. Solvers
+#      solve_n_queens_propagation(n, method, strategy)
+#          Finds all solutions using domain propagation.  strategy controls
+#          queen selection ("inorder" or "mrv"); method controls how solutions
+#          are collected ("recursion" or "generator").
+#
+#      solve_n_queens_cp(n)
+#          Delegates to the OR-Tools CP-SAT constraint solver.
+#
+#   2. UI
+#      NQueensApp — a tkinter application that lets the user choose N and a
+#      solve method, displays solutions on a chessboard canvas, and steps
+#      through them with Prev / Next buttons.
+#
+# ──────────────────────────────────────────────────────────────────────────────
+
 from ortools.sat.python import cp_model
 import tkinter as tk
 from tkinter import messagebox
