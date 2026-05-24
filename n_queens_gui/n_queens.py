@@ -108,6 +108,12 @@ def solve_n_queens_propagation(n, method="recursion", strategy="mrv"):
                     yield from search_propagation(new_unassigned, new_assigned)
 
     domain = frozenset(range(n))
+    # This calls search_propagation() and exhausts the generator to collect solutions 
+    # in yielded_solutions. 
+    # In recursion mode, search_propagation() appends to solutions as a side effect, 
+    # and yielded_solutions is ignored. 
+    # In generator mode, solutions is ignored, and yielded_solutions is the list of 
+    # solutions collected from the generator.
     yielded_solutions = list(
         search_propagation({Queen(row, avail_cols=domain) for row in domain}, set()))
     return solutions if method == "recursion" else yielded_solutions
