@@ -4,7 +4,7 @@ Solutions to the classic N-Queens problem — place N queens on an N×N chessboa
 
 ## Live demo (Google Colab)
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1_2U2m3pMcF3CqCvYh96ka1zZXTVhlXRB?usp=sharing)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1hZeONlxVCV9KhdH9bkHTJHrQQBNg0QNJ?usp=sharing)
 
 No installation required — runs entirely in the browser.
 
@@ -23,7 +23,6 @@ No installation required — runs entirely in the browser.
 | File | Description |
 |------|-------------|
 | `n_queens_colab/n_queens_colab.py` | Source for the Colab notebook (ipywidgets + matplotlib UI) |
-| `n_queens_colab/make_notebook.py` | Script that splits the source into cells and writes `n_queens.ipynb` |
-| `n_queens_colab/n_queens.ipynb` | The generated Jupyter notebook |
-| `n_queens_colab/n_queens.py` | Desktop version (tkinter UI, requires local Python) |
+| `n_queens_colab/make_notebook.py` | Script that splits the source into cells and writes `n_queens_colab.ipynb` |
+| `n_queens_colab/n_queens_colab.ipynb` | The generated Jupyter notebook |
 | `n_queens_gui/n_queens.py` | Earlier GUI version |
