@@ -30,6 +30,15 @@ pip_and_imports = (
     + cell_imports
 )
 
+def strip_marker(src):
+    """Strip the first non-empty line (the # ── marker) from a cell's source."""
+    lines = src.split('\n')
+    i = 0
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    i += 1  # skip the marker line itself
+    return '\n'.join(lines[i:]).lstrip('\n')
+
 def code_cell(src):
     return {
         "cell_type": "code",
@@ -39,18 +48,21 @@ def code_cell(src):
         "source": src
     }
 
+def headed_cell(header, src):
+    return code_cell(f'{header}\n\n{src}')
+
 MARKDOWN = """\
 # N-Queens Solver
 
 ## First time (or after a Colab disconnect)
-1. Click the **pip-install cell** (the second cell below).
+1. Click the **Setup cell** (the second cell below).
 2. From the **Runtime** menu choose **Run this cell and below**. \
-A red squiggly line will appear under `show` in the **Layout cell** (the first cell below) — you can ignore it.
-3. Click the **Layout cell**. Click the white circle with the forward-pointing triangle \
+A red squiggly line will appear under `run_n_queens` in the **Run cell** (the first cell below) — you can ignore it.
+3. Click the **Run cell**. Click the white circle with the forward-pointing triangle \
 (upper-left corner) to run the app.
 
 ## Subsequent runs
-Just run the **Layout cell** (the first cell below).
+Just run the **Run cell** (the first cell below).
 
 ---
 
@@ -61,7 +73,11 @@ domain propagation prunes available columns at each step.
 always assign the queen with the fewest remaining legal columns first, \
 detecting dead ends earlier.
 - *OR-Tools CP-SAT* — delegates to Google's industrial-strength \
-constraint-programming solver.\
+constraint-programming solver.
+
+---
+
+The Github repo is available [here](https://github.com/RussAbbott/N_Queens).\
 """
 
 notebook = {
@@ -71,14 +87,14 @@ notebook = {
             "metadata": {},
             "source": MARKDOWN
         },
-        code_cell(cell_layout),       # Cell 1 — Layout (top, easy to re-run)
-        code_cell(pip_and_imports),   # Cell 2 — pip install + imports
-        code_cell(cell_solver1),      # Cell 3 — Solver 1: domain propagation
-        code_cell(cell_solver2),      # Cell 4 — Solver 2: OR-Tools CP-SAT
-        code_cell(cell_drawing),      # Cell 5 — Drawing
-        code_cell(cell_state),        # Cell 6 — State
-        code_cell(cell_widgets),      # Cell 7 — Widgets
-        code_cell(cell_callbacks),    # Cell 8 — Callbacks
+        headed_cell('# Cell 1. Run',                                strip_marker(cell_layout)),
+        headed_cell('# Cell 2. Setup',                              pip_and_imports),
+        headed_cell('# Cell 3. Solver 1: Domain propagation',       strip_marker(cell_solver1)),
+        headed_cell('# Cell 4. Solver 2: OR-Tools CP-SAT',          strip_marker(cell_solver2)),
+        headed_cell('# Cell 5. Drawing',                            strip_marker(cell_drawing)),
+        headed_cell('# Cell 6. State',                              strip_marker(cell_state)),
+        headed_cell('# Cell 7. Widgets',                            strip_marker(cell_widgets)),
+        headed_cell('# Cell 8. Callbacks',                          strip_marker(cell_callbacks)),
     ],
     "metadata": {
         "colab": {"provenance": []},

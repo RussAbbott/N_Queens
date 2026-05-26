@@ -313,7 +313,7 @@ solve_btn.on_click(on_solve)
 prev_btn.on_click(on_prev)
 next_btn.on_click(on_next)
 
-def show():
+def run_n_queens():
     display(widgets.VBox([
         widgets.HBox([n_input, method_drop, solve_btn]),
         board_out,
@@ -325,4 +325,4 @@ def show():
 
 # ── Layout ────────────────────────────────────────────────────────────────────
 
-show()
+run_n_queens()
