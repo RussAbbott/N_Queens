@@ -112,7 +112,7 @@ notebook = {
     "nbformat_minor": 5
 }
 
-with open('n_queens.ipynb', 'w', encoding='utf-8') as f:
+with open('n_queens_colab.ipynb', 'w', encoding='utf-8') as f:
     json.dump(notebook, f, indent=1, ensure_ascii=False)
 
-print("Created n_queens.ipynb")
+print("Created n_queens_colab.ipynb")

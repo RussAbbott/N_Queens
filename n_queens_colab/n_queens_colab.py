@@ -12,7 +12,7 @@ import matplotlib.patches as patches
 
 # ── Solver 1: Domain propagation ──────────────────────────────────────────────
 
-def solve_n_queens_propagation(n, method="recursion", strategy="mrv"):
+def solve_n_queens_propagation(n, method="recursion", strategy="mrv", trace=None):
     """
     Find all solutions to the N-Queens problem using domain propagation.
 
@@ -55,12 +55,19 @@ def solve_n_queens_propagation(n, method="recursion", strategy="mrv"):
     """
     class Queen:
         # Since Queens are kept in sets, each needs a row variable to identify it.
-        # avail_cols is a frozenset of available columns, or None if assigned.
-        # assigned_col is None until a column is assigned.
-        def __init__(self, row, avail_cols=None, assigned_col=None):
+        # avail_cols:   frozenset of columns still to try if backtracked to this queen.
+        #               For unassigned queens this is the full remaining domain;
+        #               for assigned queens it is the columns after the current one
+        #               in sorted order (i.e. what we would try next on backtrack).
+        # assigned_col: None until a column is assigned.
+        # visited_cols: list of columns tried before the current assignment,
+        #               most recently tried first.  Built up as the for-loop in
+        #               search_propagation advances through sorted(avail_cols).
+        def __init__(self, row, avail_cols=None, assigned_col=None, visited_cols=None):
             self.row = row
             self.avail_cols = avail_cols
             self.assigned_col = assigned_col
+            self.visited_cols = visited_cols if visited_cols is not None else []
 
         def constrain(self, col, row_dist):
             # Return a new Queen with col and both diagonals at row_dist removed.
@@ -93,6 +100,16 @@ def solve_n_queens_propagation(n, method="recursion", strategy="mrv"):
     # o generator mode: the base case yields the solution upward; yield from
     #   propagates it all the way to the list() call at the top level.
     def search_propagation(unassigned_queens, assigned_queens):
+        # Snapshot this node for the trace — skip the empty initial state so the
+        # first visible step always has at least one queen placed.
+        if trace is not None and assigned_queens:
+            trace.append({
+                # Each assigned entry: (row, col, avail_cols, visited_cols)
+                # avail_cols = cols still to try on backtrack; visited_cols = tried before col.
+                'assigned':   [(q.row, q.assigned_col, q.avail_cols, q.visited_cols)
+                               for q in assigned_queens],
+                'unassigned': {q.row: q.avail_cols for q in unassigned_queens},
+            })
         if not unassigned_queens:
             # Base case: every queen has been assigned -- record the solution.
             sorted_queens = sorted(assigned_queens, key=lambda q: q.row)
@@ -107,14 +124,46 @@ def solve_n_queens_propagation(n, method="recursion", strategy="mrv"):
                      (lambda q: len(q.avail_cols))
             next_queen = min(unassigned_queens, key=key_fn)
 
-            for col in next_queen.avail_cols:
+            # Sort avail_cols so the iteration order is deterministic and the
+            # visited_cols / remaining-cols numbers are meaningful left-to-right.
+            sorted_avail = sorted(next_queen.avail_cols)
+            loop_tried   = []   # cols tried so far in this loop, most recent first
+
+            for i, col in enumerate(sorted_avail):
+                current_visited_cols = loop_tried + next_queen.visited_cols
+                remaining       = frozenset(sorted_avail[i + 1:])
+
                 new_unassigned = constrain_all(unassigned_queens - {next_queen},
                                                col,
                                                next_queen.row)
                 if new_unassigned is not None:
-                    new_assigned = (assigned_queens |
-                                    {Queen(next_queen.row, assigned_col=col)})
+                    new_queen    = Queen(next_queen.row,
+                                        avail_cols=remaining,
+                                        assigned_col=col,
+                                        visited_cols=current_visited_cols)
+                    new_assigned = assigned_queens | {new_queen}
                     yield from search_propagation(new_unassigned, new_assigned)
+                elif trace is not None:
+                    # Dead end: capture the attempted placement with visited_cols/remaining
+                    # so the board can show what has been tried and what remains.
+                    attempted = list(assigned_queens) + [
+                        Queen(next_queen.row,
+                              avail_cols=remaining,
+                              assigned_col=col,
+                              visited_cols=current_visited_cols)
+                    ]
+                    partial = {
+                        q.row: q.constrain(col, abs(next_queen.row - q.row)).avail_cols
+                        for q in unassigned_queens - {next_queen}
+                    }
+                    trace.append({
+                        'assigned':   [(q.row, q.assigned_col, q.avail_cols, q.visited_cols)
+                                       for q in attempted],
+                        'unassigned': partial,
+                        'dead_end':   True,
+                    })
+
+                loop_tried = [col] + loop_tried   # prepend — most recent first
 
     domain = frozenset(range(n))
     yielded_solutions = list(
@@ -199,18 +248,93 @@ LIGHT_SQ = '#F0D9B5'
 DARK_SQ  = '#B58863'
 QUEEN_FG = '#1a1a2e'
 
-def draw_board(solution, n):
+def draw_board(solution, n, trace_state=None):
+    """
+    Draw the chessboard.
+
+    Normal mode (trace_state is None):
+        solution — list of column indices (solution[row] = col), or None for blank.
+
+    Trace mode (trace_state is a dict):
+        'assigned' : list of (row, col, avail_cols, visited_cols) tuples
+            col       — current queen position        → ♛
+            avail_cols — frozenset of cols still to try on backtrack
+                         → green +1, +2, … in sorted(avail_cols) order
+            visited_cols   — list of previously tried cols, most recent first
+                         → red  -1, -2, … in order
+
+        Numbers appear only in rows with a placed queen.
+        Unassigned rows show a plain board square.
+    """
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_facecolor('#ecf0f1')
+
+    queen_fs  = max(8, int(280 / n))
+    number_fs = max(6, int(130 / n))
+    lw        = max(1.5, 12 / n)
+    margin    = 0.18
+
+    def draw_x(r, c, color, alpha):
+        x0, x1 = c + margin, c + 1 - margin
+        y0, y1 = n - 1 - r + margin, n - r - margin
+        kw = dict(color=color, alpha=alpha, linewidth=lw, solid_capstyle='round')
+        ax.plot([x0, x1], [y0, y1], **kw)
+        ax.plot([x0, x1], [y1, y0], **kw)
+
+    # Draw all squares first.
     for row in range(n):
         for col in range(n):
-            color = LIGHT_SQ if (row + col) % 2 == 0 else DARK_SQ
-            ax.add_patch(patches.Rectangle((col, n - 1 - row), 1, 1, color=color))
-            if solution is not None and solution[row] == col:
-                ax.text(col + 0.5, n - 0.5 - row, '♛',
-                        ha='center', va='center',
-                        fontsize=max(8, int(280 / n)),
-                        color=QUEEN_FG)
+            sq_color = LIGHT_SQ if (row + col) % 2 == 0 else DARK_SQ
+            ax.add_patch(patches.Rectangle((col, n - 1 - row), 1, 1, color=sq_color))
+
+    if trace_state is not None:
+        assigned  = trace_state['assigned']    # [(row, col, avail_cols, visited_cols), ...]
+        avail_map = trace_state['unassigned']  # {row: frozenset}
+
+        # Helper: columns attacked in `target_row` by placed queens
+        # via column or diagonal only (no horizontal).
+        def col_diag_attacks(target_row):
+            attacked = set()
+            for q_row, q_col, _, _ in assigned:
+                if q_row == target_row:
+                    continue
+                d = abs(target_row - q_row)
+                attacked.add(q_col)
+                if 0 <= q_col + d < n: attacked.add(q_col + d)
+                if 0 <= q_col - d < n: attacked.add(q_col - d)
+            return attacked
+
+        # Red X on eliminated cells in unassigned rows.
+        for row, avail_cols in avail_map.items():
+            for col in range(n):
+                if col not in avail_cols:
+                    draw_x(row, col, color='red', alpha=0.55)
+
+        # Red X in assigned rows: column/diagonal attacks from other queens,
+        # skipping the queen's own cell and any cell that already has a number.
+        for q_row, q_col, avail, visited_cols in assigned:
+            number_cells = set(avail) | set(visited_cols)
+            for col in col_diag_attacks(q_row):
+                if col != q_col and col not in number_cells:
+                    draw_x(q_row, col, color='red', alpha=0.55)
+
+        # Queens, future options (+k green), visited cols (-k blue) in assigned rows.
+        for q_row, q_col, avail, visited_cols in assigned:
+            ax.text(q_col + 0.5, n - 0.5 - q_row, '♛',
+                    ha='center', va='center', fontsize=queen_fs, color=QUEEN_FG)
+            for k, ac in enumerate(sorted(avail), start=1):
+                ax.text(ac + 0.5, n - 0.5 - q_row, f'+{k}',
+                        ha='center', va='center', fontsize=number_fs,
+                        color='darkgreen')
+            for k, jc in enumerate(visited_cols, start=1):
+                ax.text(jc + 0.5, n - 0.5 - q_row, f'-{k}',
+                        ha='center', va='center', fontsize=number_fs,
+                        color='blue')
+    elif solution is not None:
+        for row in range(n):
+            ax.text(solution[row] + 0.5, n - 0.5 - row, '♛',
+                    ha='center', va='center', fontsize=queen_fs, color=QUEEN_FG)
+
     ax.set_xlim(0, n)
     ax.set_ylim(0, n)
     ax.set_aspect('equal')
@@ -222,14 +346,15 @@ def draw_board(solution, n):
 
 # ── State ─────────────────────────────────────────────────────────────────────
 
-state = {'solutions': [], 'current': 0, 'n': 8}
+state = {'solutions': [], 'current': 0, 'n': 8, 'trace': False, 'trace_states': []}
 
 
 # ── Widgets ───────────────────────────────────────────────────────────────────
 
+n_label = widgets.Label('N:', layout=widgets.Layout(width='22px'))
 n_input = widgets.BoundedIntText(
-    value=8, min=1, max=20, description='N:',
-    layout=widgets.Layout(width='120px'))
+    value=8, min=1, max=20, description='',
+    layout=widgets.Layout(width='70px'))
 
 _method_options = [
     ('In-order, recursion',  'inorder-rec'),
@@ -249,6 +374,9 @@ method_drop = widgets.Dropdown(
 solve_btn = widgets.Button(
     description='Solve', button_style='success',
     layout=widgets.Layout(width='90px'))
+trace_chk = widgets.Checkbox(
+    value=False, description='Trace (N ≤ 6)',
+    indent=False, layout=widgets.Layout(width='140px'))
 prev_btn  = widgets.Button(
     description='◀ Prev', button_style='info',
     disabled=True, layout=widgets.Layout(width='100px'))
@@ -263,32 +391,73 @@ board_out = widgets.Output()
 
 # ── Callbacks ─────────────────────────────────────────────────────────────────
 
+def _step_label(c):
+    """Status label for the current step/solution in either mode."""
+    if state['trace']:
+        total  = len(state['trace_states'])
+        n_sols = len(state['solutions'])
+        ts     = state['trace_states'][c]
+        if ts.get('dead_end'):
+            marker = '  ✗ Dead end'
+        elif not ts['unassigned']:
+            marker = '  ★ Solution!'
+        else:
+            marker = ''
+        s = '' if n_sols == 1 else 's'
+        return f'Step {c + 1} of {total}{marker}  ({n_sols} solution{s})'
+    else:
+        total = len(state['solutions'])
+        return f'Solution {c + 1} of {total}'
+
 def refresh():
     with board_out:
         clear_output(wait=True)
-        sol = state['solutions']
-        draw_board(sol[state['current']] if sol else None, state['n'])
+        n  = state['n']
+        c  = state['current']
+        if state['trace'] and state['trace_states']:
+            draw_board(None, n, trace_state=state['trace_states'][c])
+        else:
+            sol = state['solutions']
+            draw_board(sol[c] if sol else None, n)
 
 def update_nav():
-    c, total = state['current'], len(state['solutions'])
-    prev_btn.disabled = c == 0
-    next_btn.disabled = c == total - 1
+    c     = state['current']
+    total = len(state['trace_states']) if state['trace'] else len(state['solutions'])
+    prev_btn.disabled = (c == 0)
+    next_btn.disabled = (c == total - 1)
 
 def on_solve(_):
-    n      = n_input.value
-    method = method_drop.value
+    n        = n_input.value
+    method   = method_drop.value
+    is_trace = trace_chk.value
+
+    if is_trace and method == 'cp':
+        status.value = 'Trace not available for OR-Tools — please choose a propagation method'
+        return
+    if is_trace and n > 6:
+        status.value = f'Trace mode: N = {n} may be very large — please set N ≤ 6'
+        return
+
+    trace_steps = [] if is_trace else None
+
     if method == 'cp':
         solutions = solve_n_queens_cp(n)
     else:
         strategy, m = method.split('-')          # e.g. 'mrv-rec' -> 'mrv', 'rec'
         full_method  = 'recursion' if m == 'rec' else 'generator'
-        solutions = solve_n_queens_propagation(n, full_method, strategy)
-    state.update({'n': n, 'current': 0, 'solutions': solutions})
-    total = len(solutions)
-    if total:
-        status.value = f'Solution 1 of {total}'
+        solutions = solve_n_queens_propagation(n, full_method, strategy, trace=trace_steps)
+
+    state.update({'n': n, 'current': 0, 'solutions': solutions,
+                  'trace': is_trace, 'trace_states': trace_steps or []})
+
+    if is_trace:
+        status.value = _step_label(0)
         prev_btn.disabled = True
-        next_btn.disabled = total == 1
+        next_btn.disabled = len(trace_steps) <= 1
+    elif solutions:
+        status.value = f'Solution 1 of {len(solutions)}'
+        prev_btn.disabled = True
+        next_btn.disabled = len(solutions) == 1
     else:
         status.value = f'No solutions for N = {n}'
         prev_btn.disabled = True
@@ -297,15 +466,13 @@ def on_solve(_):
 
 def on_prev(_):
     state['current'] -= 1
-    c, total = state['current'], len(state['solutions'])
-    status.value = f'Solution {c + 1} of {total}'
+    status.value = _step_label(state['current'])
     update_nav()
     refresh()
 
 def on_next(_):
     state['current'] += 1
-    c, total = state['current'], len(state['solutions'])
-    status.value = f'Solution {c + 1} of {total}'
+    status.value = _step_label(state['current'])
     update_nav()
     refresh()
 
@@ -314,13 +481,38 @@ prev_btn.on_click(on_prev)
 next_btn.on_click(on_next)
 
 def run_n_queens():
+    from IPython.display import Javascript
+    # Clear any stale board content and reset UI to a clean state.
+    with board_out:
+        clear_output(wait=True)
+        draw_board(None, n_input.value)
+    prev_btn.disabled = True
+    next_btn.disabled = True
+    status.value = 'Enter N and press Solve'
+    state.update({'solutions': [], 'current': 0, 'n': n_input.value,
+                  'trace': False, 'trace_states': []})
     display(widgets.VBox([
-        widgets.HBox([n_input, method_drop, solve_btn]),
+        widgets.HBox([n_label, n_input, method_drop, solve_btn]),
+        widgets.HBox([trace_chk,
+                      widgets.Label('  ← → arrow keys step through trace',
+                                    layout=widgets.Layout(width='280px'))]),
         board_out,
         widgets.HBox([prev_btn, status, next_btn])
     ]))
-    with board_out:
-        draw_board(None, state['n'])
+    # Wire left/right arrow keys to the Prev / Next buttons.
+    display(Javascript("""
+    if (window._nq_keydown) document.removeEventListener('keydown', window._nq_keydown);
+    window._nq_keydown = function(e) {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        document.querySelectorAll('button.widget-button').forEach(function(btn) {
+            var t = btn.textContent.trim();
+            if (e.key === 'ArrowLeft'  && t.includes('Prev') && !btn.disabled) btn.click();
+            if (e.key === 'ArrowRight' && t.includes('Next') && !btn.disabled) btn.click();
+        });
+    };
+    document.addEventListener('keydown', window._nq_keydown);
+    """))
 
 
 # ── Layout ────────────────────────────────────────────────────────────────────
