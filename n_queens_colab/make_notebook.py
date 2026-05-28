@@ -26,7 +26,7 @@ cell_callbacks = source[positions[5]:positions[6]].rstrip()
 cell_layout    = source[positions[6]:].strip()
 
 pip_and_imports = (
-    '!pip install ortools "protobuf>=3.20.2,<6.0.0" -q\n\n'
+    '!pip install ortools -q\n\n'
     + cell_imports
 )
 
@@ -76,6 +76,8 @@ detecting dead ends earlier.
 constraint-programming solver.
 
 ---
+
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RussAbbott/N_Queens/blob/master/n_queens_colab/n_queens_colab.ipynb)
 
 The Github repo is available [here](https://github.com/RussAbbott/N_Queens).\
 """

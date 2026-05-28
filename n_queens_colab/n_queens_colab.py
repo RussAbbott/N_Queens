@@ -36,7 +36,7 @@ def solve_n_queens_propagation(n, method="recursion", strategy="mrv", trace=None
     method — controls how solutions are collected:
         "recursion"  solutions are accumulated as a side effect in the
                      pre-defined solutions list and returned when the
-                     generator is fully exhausted.
+                     generator is exhausted.
         "generator"  each solution is yielded as it is found and
                      propagated upward via yield from; the caller
                      collects them with list().
@@ -105,7 +105,8 @@ def solve_n_queens_propagation(n, method="recursion", strategy="mrv", trace=None
         if trace is not None and assigned_queens:
             trace.append({
                 # Each assigned entry: (row, col, avail_cols, visited_cols)
-                # avail_cols = cols still to try on backtrack; visited_cols = tried before col.
+                # avail_cols = cols still to try on backtrack; 
+                # visited_cols = tried before col.
                 'assigned':   [(q.row, q.assigned_col, q.avail_cols, q.visited_cols)
                                for q in assigned_queens],
                 'unassigned': {q.row: q.avail_cols for q in unassigned_queens},
@@ -138,19 +139,19 @@ def solve_n_queens_propagation(n, method="recursion", strategy="mrv", trace=None
                                                next_queen.row)
                 if new_unassigned is not None:
                     new_queen    = Queen(next_queen.row,
-                                        avail_cols=remaining,
-                                        assigned_col=col,
-                                        visited_cols=current_visited_cols)
+                                         avail_cols=remaining,
+                                         assigned_col=col,
+                                         visited_cols=current_visited_cols)
                     new_assigned = assigned_queens | {new_queen}
                     yield from search_propagation(new_unassigned, new_assigned)
                 elif trace is not None:
                     # Dead end: capture the attempted placement with visited_cols/remaining
                     # so the board can show what has been tried and what remains.
                     attempted = list(assigned_queens) + [
-                        Queen(next_queen.row,
-                              avail_cols=remaining,
-                              assigned_col=col,
-                              visited_cols=current_visited_cols)
+                                Queen(next_queen.row,
+                                      avail_cols=remaining,
+                                      assigned_col=col,
+                                      visited_cols=current_visited_cols)
                     ]
                     partial = {
                         q.row: q.constrain(col, abs(next_queen.row - q.row)).avail_cols
@@ -271,15 +272,12 @@ def draw_board(solution, n, trace_state=None):
 
     queen_fs  = max(8, int(280 / n))
     number_fs = max(6, int(130 / n))
-    lw        = max(1.5, 12 / n)
-    margin    = 0.18
 
     def draw_x(r, c, color, alpha):
-        x0, x1 = c + margin, c + 1 - margin
-        y0, y1 = n - 1 - r + margin, n - r - margin
-        kw = dict(color=color, alpha=alpha, linewidth=lw, solid_capstyle='round')
-        ax.plot([x0, x1], [y0, y1], **kw)
-        ax.plot([x0, x1], [y1, y0], **kw)
+        ax.text(c + 0.5, n - 0.5 - r, 'X',
+                ha='center', va='center',
+                fontsize=number_fs, fontweight='bold',
+                color=color, alpha=alpha)
 
     # Draw all squares first.
     for row in range(n):
@@ -354,6 +352,7 @@ state = {'solutions': [], 'current': 0, 'n': 8, 'trace': False, 'trace_states': 
 n_label = widgets.Label('N:', layout=widgets.Layout(width='22px'))
 n_input = widgets.BoundedIntText(
     value=8, min=1, max=20, description='',
+    style={'description_width': '0px'},
     layout=widgets.Layout(width='70px'))
 
 _method_options = [
@@ -365,18 +364,20 @@ _method_options = [
 if _ORTOOLS:
     _method_options.append(('OR-Tools CP-SAT', 'cp'))
 
+method_label = widgets.Label('Method:', layout=widgets.Layout(width='55px', margin='0 0 0 20px'))
 method_drop = widgets.Dropdown(
     options=_method_options,
-    value='mrv-rec',
-    description='Method:',
-    layout=widgets.Layout(width='260px'))
+    value='inorder-rec',
+    description='',
+    style={'description_width': '0px'},
+    layout=widgets.Layout(width='160px', margin='0 0 0 2px'))
 
 solve_btn = widgets.Button(
     description='Solve', button_style='success',
     layout=widgets.Layout(width='90px'))
-trace_chk = widgets.Checkbox(
-    value=False, description='Trace (N ≤ 6)',
-    indent=False, layout=widgets.Layout(width='140px'))
+trace_btn = widgets.Button(
+    description='Solve with Trace', button_style='warning',
+    layout=widgets.Layout(width='145px'))
 prev_btn  = widgets.Button(
     description='◀ Prev', button_style='info',
     disabled=True, layout=widgets.Layout(width='100px'))
@@ -384,9 +385,10 @@ next_btn  = widgets.Button(
     description='Next ▶', button_style='info',
     disabled=True, layout=widgets.Layout(width='100px'))
 status    = widgets.Label(
-    value='Enter N and press Solve',
-    layout=widgets.Layout(width='250px'))
+    value='Enter N and Method, then press Solve or Solve with Trace.',
+    layout=widgets.Layout(width='440px'))
 board_out = widgets.Output()
+narrative = widgets.HTML('', layout=widgets.Layout(width='440px'))
 
 
 # ── Callbacks ─────────────────────────────────────────────────────────────────
@@ -394,20 +396,78 @@ board_out = widgets.Output()
 def _step_label(c):
     """Status label for the current step/solution in either mode."""
     if state['trace']:
-        total  = len(state['trace_states'])
-        n_sols = len(state['solutions'])
-        ts     = state['trace_states'][c]
-        if ts.get('dead_end'):
-            marker = '  ✗ Dead end'
-        elif not ts['unassigned']:
-            marker = '  ★ Solution!'
-        else:
-            marker = ''
+        total      = len(state['trace_states'])
+        n_sols     = len(state['solutions'])
+        sols_so_far = sum(
+            1 for t in state['trace_states'][:c + 1]
+            if not t.get('dead_end') and not t['unassigned']
+        )
         s = '' if n_sols == 1 else 's'
-        return f'Step {c + 1} of {total}{marker}  ({n_sols} solution{s})'
+        return f' Step {c + 1} of {total}  ({sols_so_far} of {n_sols} solution{s})'
     else:
         total = len(state['solutions'])
         return f'Solution {c + 1} of {total}'
+
+def _narrative(c):
+    """One-line description of the transition that led to trace step c."""
+    if not state['trace'] or not state['trace_states']:
+        return ''
+    ts   = state['trace_states'][c]
+    curr = {row: col for row, col, _, _ in ts['assigned']}
+
+    if not ts['unassigned'] and not ts.get('dead_end'):
+        if c > 0:
+            prev_c   = {row: col for row, col, _, _ in state['trace_states'][c - 1]['assigned']}
+            new_rows = set(curr) - set(prev_c)
+            if new_rows:
+                r = sorted(new_rows)[0]
+                return f'Placing queen in row {r + 1} at column {curr[r] + 1}. Solution found!'
+        return 'Solution found!'
+
+    if ts.get('dead_end'):
+        prev_rows = (
+            {row for row, *_ in state['trace_states'][c - 1]['assigned']}
+            if c > 0 else set()
+        )
+        new_rows = set(curr) - prev_rows
+        r, col = (sorted(new_rows)[0], curr[sorted(new_rows)[0]]) if new_rows \
+            else sorted(curr.items())[-1]
+        return (f'Placing queen in row {r + 1} at column {col + 1}.<br>'
+                f'Dead end. At least one unassigned row has no safe positions.')
+
+    if c == 0:
+        r, col = sorted(curr.items())[0]
+        return f'Placing first queen in row {r + 1} at column {col + 1}.'
+
+    prev      = {row: col for row, col, _, _ in state['trace_states'][c - 1]['assigned']}
+    curr_rows = set(curr)
+    prev_rows = set(prev)
+    new_rows  = curr_rows - prev_rows
+    lost_rows = prev_rows - curr_rows
+
+    if new_rows and not lost_rows:
+        r = sorted(new_rows)[0]
+        return f'Placing queen in row {r + 1} at column {curr[r] + 1}.'
+
+    if lost_rows:
+        changed = {r for r in curr_rows & prev_rows if curr[r] != prev[r]}
+        if changed:
+            r = sorted(changed)[0]
+            return (f'Backtracking to row {r + 1}. '
+                    f'Placing queen at column {curr[r] + 1}, the next safe position.')
+        if new_rows:
+            r = sorted(new_rows)[0]
+            return f'Backtracking — placing queen in row {r + 1} at column {curr[r] + 1}.'
+        rows_str = ', '.join(str(r + 1) for r in sorted(lost_rows))
+        s = 's' if len(lost_rows) > 1 else ''
+        return f'Backtracking — all options exhausted for row{s} {rows_str}.'
+
+    # Same rows, one queen advanced to its next column at the same depth.
+    changed = {r for r in curr_rows if curr.get(r) != prev.get(r)}
+    if changed:
+        r = sorted(changed)[0]
+        return f'Row {r + 1} advances to next available column {curr[r] + 1}.'
+    return ''
 
 def refresh():
     with board_out:
@@ -426,16 +486,17 @@ def update_nav():
     prev_btn.disabled = (c == 0)
     next_btn.disabled = (c == total - 1)
 
-def on_solve(_):
-    n        = n_input.value
-    method   = method_drop.value
-    is_trace = trace_chk.value
+def _do_solve(is_trace):
+    n      = n_input.value
+    method = method_drop.value
 
     if is_trace and method == 'cp':
-        status.value = 'Trace not available for OR-Tools — please choose a propagation method'
+        status.value    = 'Trace not available for OR-Tools — please choose a propagation method.'
+        narrative.value = ''
         return
     if is_trace and n > 6:
-        status.value = f'Trace mode: N = {n} may be very large — please set N ≤ 6'
+        status.value    = f'Trace mode: N = {n} may be very large — please set N ≤ 6.'
+        narrative.value = ''
         return
 
     trace_steps = [] if is_trace else None
@@ -451,54 +512,98 @@ def on_solve(_):
                   'trace': is_trace, 'trace_states': trace_steps or []})
 
     if is_trace:
-        status.value = _step_label(0)
+        status.value    = _step_label(0)
+        narrative.value = _narrative(0)
         prev_btn.disabled = True
-        next_btn.disabled = len(trace_steps) <= 1
+        next_btn.disabled = False if trace_steps is None else len(trace_steps) <= 1
     elif solutions:
-        status.value = f'Solution 1 of {len(solutions)}'
+        status.value    = f'Solution 1 of {len(solutions)}'
+        narrative.value = ''
         prev_btn.disabled = True
         next_btn.disabled = len(solutions) == 1
     else:
-        status.value = f'No solutions for N = {n}'
+        status.value    = f'No solutions for N = {n}'
+        narrative.value = ''
         prev_btn.disabled = True
         next_btn.disabled = True
     refresh()
 
+def on_solve(_):       _do_solve(False)
+def on_trace_solve(_): _do_solve(True)
+
 def on_prev(_):
     state['current'] -= 1
-    status.value = _step_label(state['current'])
+    c = state['current']
+    status.value    = _step_label(c)
+    narrative.value = _narrative(c)
     update_nav()
     refresh()
 
 def on_next(_):
     state['current'] += 1
-    status.value = _step_label(state['current'])
+    c = state['current']
+    status.value    = _step_label(c)
+    narrative.value = _narrative(c)
     update_nav()
     refresh()
 
 solve_btn.on_click(on_solve)
+trace_btn.on_click(on_trace_solve)
 prev_btn.on_click(on_prev)
 next_btn.on_click(on_next)
 
 def run_n_queens():
-    from IPython.display import Javascript
+    from IPython.display import Javascript, HTML
     # Clear any stale board content and reset UI to a clean state.
     with board_out:
         clear_output(wait=True)
         draw_board(None, n_input.value)
     prev_btn.disabled = True
     next_btn.disabled = True
-    status.value = 'Enter N and press Solve'
+    status.value    = 'Enter N and Method values. Then press Solve or Solve with Trace.'
+    narrative.value = ''
     state.update({'solutions': [], 'current': 0, 'n': n_input.value,
                   'trace': False, 'trace_states': []})
-    display(widgets.VBox([
-        widgets.HBox([n_label, n_input, method_drop, solve_btn]),
-        widgets.HBox([trace_chk,
-                      widgets.Label('  ← → arrow keys step through trace',
-                                    layout=widgets.Layout(width='280px'))]),
-        board_out,
-        widgets.HBox([prev_btn, status, next_btn])
-    ]))
+
+    # background_color in Layout is overridden by Colab's CSS; inject a
+    # <style> block with !important and also force dark text so labels
+    # remain readable on the coloured backgrounds.
+    display(HTML("""<style>
+    .nq-ctrl { background-color: #d6e8f8 !important; }
+    .nq-narr { background-color: #fdf6d0 !important; }
+    .nq-ctrl .widget-label, .nq-ctrl .widget-readout,
+    .nq-narr .widget-label, .nq-narr .widget-html-content {
+        color: #222222 !important;
+    }
+    </style>"""))
+
+    _ROW_W    = '329px'   # natural width of the N / Method row
+    _box_style = dict(width='490px', padding='8px 12px', margin='0 0 6px 0',
+                      border_radius='6px', border='1px solid #aaaaaa',
+                      align_items='center')
+
+    ctrl_box = widgets.VBox([
+        widgets.HBox([n_label, n_input, method_label, method_drop],
+                     layout=widgets.Layout(width=_ROW_W)),
+        widgets.HBox([solve_btn, trace_btn],
+                     layout=widgets.Layout(width=_ROW_W,
+                                           justify_content='space-between')),
+    ], layout=widgets.Layout(**_box_style))
+    ctrl_box.add_class('nq-ctrl')
+
+    narration_box = widgets.VBox([
+        widgets.HBox([prev_btn,
+                      widgets.HTML('<div style="text-align:center">'
+                                   '(or left/right arrow keys)</div>',
+                                   layout=widgets.Layout(flex='1')),
+                      next_btn],
+                     layout=widgets.Layout(width='100%')),
+        status,
+        narrative,
+    ], layout=widgets.Layout(**_box_style))
+    narration_box.add_class('nq-narr')
+
+    display(widgets.VBox([ctrl_box, narration_box, board_out]))
     # Wire left/right arrow keys to the Prev / Next buttons.
     display(Javascript("""
     if (window._nq_keydown) document.removeEventListener('keydown', window._nq_keydown);

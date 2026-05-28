@@ -4,7 +4,7 @@ Solutions to the classic N-Queens problem — place N queens on an N×N chessboa
 
 ## Live demo (Google Colab)
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1hZeONlxVCV9KhdH9bkHTJHrQQBNg0QNJ?usp=sharing)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RussAbbott/N_Queens/blob/master/n_queens_colab/n_queens_colab.ipynb)
 
 No installation required — runs entirely in the browser.
 
