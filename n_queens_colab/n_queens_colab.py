@@ -1,13 +1,8 @@
-try:
-    from ortools.sat.python import cp_model
-    _ORTOOLS = True
-except ImportError:
-    _ORTOOLS = False
-
 import ipywidgets as widgets
 from IPython.display import display, clear_output
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+n_queens_output = widgets.Output()
+display(n_queens_output)
+
 
 
 # ── Solver 1: Domain propagation ──────────────────────────────────────────────
@@ -177,6 +172,7 @@ def solve_n_queens_propagation(n, method="recursion", strategy="mrv", trace=None
 def solve_n_queens_cp(n):
     """
     Find all solutions to the N-Queens problem using the OR-Tools CP-SAT solver.
+    OR-Tools is installed automatically on first use if not already present.
 
     A problem specification, called a Model, consists of decision variables and
     constraints. A decision variable is a variable that can take on values from
@@ -205,6 +201,7 @@ def solve_n_queens_cp(n):
         List[List[int]]: list of solutions, each a list of n column indices
         where solution[r] is the column of the queen in row r.
     """
+    from ortools.sat.python import cp_model
     model = cp_model.CpModel()
 
     # Each queens[r] is a decision variable representing the column of the queen
@@ -244,6 +241,9 @@ def solve_n_queens_cp(n):
 
 
 # ── Drawing ───────────────────────────────────────────────────────────────────
+
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 LIGHT_SQ = '#F0D9B5'
 DARK_SQ  = '#B58863'
@@ -360,9 +360,8 @@ _method_options = [
     ('In-order, generator',  'inorder-gen'),
     ('MRV, recursion',       'mrv-rec'),
     ('MRV, generator',       'mrv-gen'),
+    ('OR-Tools CP-SAT',      'cp'),
 ]
-if _ORTOOLS:
-    _method_options.append(('OR-Tools CP-SAT', 'cp'))
 
 method_label = widgets.Label('Method:', layout=widgets.Layout(width='55px', margin='0 0 0 20px'))
 method_drop = widgets.Dropdown(
@@ -421,7 +420,7 @@ def _narrative(c):
             new_rows = set(curr) - set(prev_c)
             if new_rows:
                 r = sorted(new_rows)[0]
-                return f'Placing queen in row {r + 1} at column {curr[r] + 1}. Solution found!'
+                return f'Placing a queen in row {r + 1} at column {curr[r] + 1}. Solution found!'
         return 'Solution found!'
 
     if ts.get('dead_end'):
@@ -432,7 +431,7 @@ def _narrative(c):
         new_rows = set(curr) - prev_rows
         r, col = (sorted(new_rows)[0], curr[sorted(new_rows)[0]]) if new_rows \
             else sorted(curr.items())[-1]
-        return (f'Placing queen in row {r + 1} at column {col + 1}.<br>'
+        return (f'Placing a queen in row {r + 1} at column {col + 1}.<br>'
                 f'Dead end. At least one unassigned row has no safe positions.')
 
     if c == 0:
@@ -447,17 +446,17 @@ def _narrative(c):
 
     if new_rows and not lost_rows:
         r = sorted(new_rows)[0]
-        return f'Placing queen in row {r + 1} at column {curr[r] + 1}.'
+        return f'Placing a queen in row {r + 1} at column {curr[r] + 1}.'
 
     if lost_rows:
         changed = {r for r in curr_rows & prev_rows if curr[r] != prev[r]}
         if changed:
             r = sorted(changed)[0]
             return (f'Backtracking to row {r + 1}. '
-                    f'Placing queen at column {curr[r] + 1}, the next safe position.')
+                    f'Placing a queen at column {curr[r] + 1}, the next safe position.')
         if new_rows:
             r = sorted(new_rows)[0]
-            return f'Backtracking — placing queen in row {r + 1} at column {curr[r] + 1}.'
+            return f'Backtracking — placing a queen in row {r + 1} at column {curr[r] + 1}.'
         rows_str = ', '.join(str(r + 1) for r in sorted(lost_rows))
         s = 's' if len(lost_rows) > 1 else ''
         return f'Backtracking — all options exhausted for row{s} {rows_str}.'
@@ -502,6 +501,14 @@ def _do_solve(is_trace):
     trace_steps = [] if is_trace else None
 
     if method == 'cp':
+        try:
+            from ortools.sat.python import cp_model as _  # check availability
+        except ImportError:
+            status.value    = 'Installing OR-Tools (first use only) …'
+            narrative.value = ''
+            import subprocess, sys
+            subprocess.run([sys.executable, '-m', 'pip', 'install', 'ortools', '-q'],
+                           capture_output=True)
         solutions = solve_n_queens_cp(n)
     else:
         strategy, m = method.split('-')          # e.g. 'mrv-rec' -> 'mrv', 'rec'
@@ -603,23 +610,22 @@ def run_n_queens():
     ], layout=widgets.Layout(**_box_style))
     narration_box.add_class('nq-narr')
 
-    display(widgets.VBox([ctrl_box, narration_box, board_out]))
-    # Wire left/right arrow keys to the Prev / Next buttons.
-    display(Javascript("""
-    if (window._nq_keydown) document.removeEventListener('keydown', window._nq_keydown);
-    window._nq_keydown = function(e) {
-        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-        e.preventDefault();
-        document.querySelectorAll('button.widget-button').forEach(function(btn) {
-            var t = btn.textContent.trim();
-            if (e.key === 'ArrowLeft'  && t.includes('Prev') && !btn.disabled) btn.click();
-            if (e.key === 'ArrowRight' && t.includes('Next') && !btn.disabled) btn.click();
-        });
-    };
-    document.addEventListener('keydown', window._nq_keydown);
-    """))
-
-
-# ── Layout ────────────────────────────────────────────────────────────────────
+    n_queens_output.clear_output(wait=True)
+    with n_queens_output:
+        display(widgets.VBox([ctrl_box, narration_box, board_out]))
+        # Wire left/right arrow keys to the Prev / Next buttons.
+        display(Javascript("""
+        if (window._nq_keydown) document.removeEventListener('keydown', window._nq_keydown);
+        window._nq_keydown = function(e) {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            e.preventDefault();
+            document.querySelectorAll('button.widget-button').forEach(function(btn) {
+                var t = btn.textContent.trim();
+                if (e.key === 'ArrowLeft'  && t.includes('Prev') && !btn.disabled) btn.click();
+                if (e.key === 'ArrowRight' && t.includes('Next') && !btn.disabled) btn.click();
+            });
+        };
+        document.addEventListener('keydown', window._nq_keydown);
+        """))
 
 run_n_queens()

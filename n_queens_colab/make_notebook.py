@@ -11,24 +11,17 @@ MARKERS = [
     '# ── State',
     '# ── Widgets',
     '# ── Callbacks',
-    '# ── Layout',
 ]
 
 positions = [source.index(m) for m in MARKERS]
 
-cell_imports   = source[:positions[0]].rstrip()
-cell_solver1   = source[positions[0]:positions[1]].rstrip()
-cell_solver2   = source[positions[1]:positions[2]].rstrip()
-cell_drawing   = source[positions[2]:positions[3]].rstrip()
-cell_state     = source[positions[3]:positions[4]].rstrip()
-cell_widgets   = source[positions[4]:positions[5]].rstrip()
-cell_callbacks = source[positions[5]:positions[6]].rstrip()
-cell_layout    = source[positions[6]:].strip()
-
-pip_and_imports = (
-    '!pip install ortools -q\n\n'
-    + cell_imports
-)
+cell_app_output = source[:positions[0]].rstrip()
+cell_solver1    = source[positions[0]:positions[1]].rstrip()
+cell_solver2    = source[positions[1]:positions[2]].rstrip()
+cell_drawing    = source[positions[2]:positions[3]].rstrip()
+cell_state      = source[positions[3]:positions[4]].rstrip()
+cell_widgets    = source[positions[4]:positions[5]].rstrip()
+cell_callbacks  = source[positions[5]:].strip()
 
 def strip_marker(src):
     """Strip the first non-empty line (the # ── marker) from a cell's source."""
@@ -54,15 +47,7 @@ def headed_cell(header, src):
 MARKDOWN = """\
 # N-Queens Solver
 
-## First time (or after a Colab disconnect)
-1. Click the **Setup cell** (the second cell below).
-2. From the **Runtime** menu choose **Run this cell and below**. \
-A red squiggly line will appear under `run_n_queens` in the **Run cell** (the first cell below) — you can ignore it.
-3. Click the **Run cell**. Click the white circle with the forward-pointing triangle \
-(upper-left corner) to run the app.
-
-## Subsequent runs
-Just run the **Run cell** (the first cell below).
+Click **Run all** on the third line after "+ Code" and "+ Text.
 
 ---
 
@@ -73,7 +58,7 @@ domain propagation prunes available columns at each step.
 always assign the queen with the fewest remaining legal columns first, \
 detecting dead ends earlier.
 - *OR-Tools CP-SAT* — delegates to Google's industrial-strength \
-constraint-programming solver.
+constraint-programming solver (installed automatically on first use).
 
 ---
 
@@ -89,14 +74,13 @@ notebook = {
             "metadata": {},
             "source": MARKDOWN
         },
-        headed_cell('# Cell 1. Run',                                strip_marker(cell_layout)),
-        headed_cell('# Cell 2. Setup',                              pip_and_imports),
-        headed_cell('# Cell 3. Solver 1: Domain propagation',       strip_marker(cell_solver1)),
-        headed_cell('# Cell 4. Solver 2: OR-Tools CP-SAT',          strip_marker(cell_solver2)),
-        headed_cell('# Cell 5. Drawing',                            strip_marker(cell_drawing)),
-        headed_cell('# Cell 6. State',                              strip_marker(cell_state)),
-        headed_cell('# Cell 7. Widgets',                            strip_marker(cell_widgets)),
-        headed_cell('# Cell 8. Callbacks',                          strip_marker(cell_callbacks)),
+        headed_cell('# Cell 1. N-Queens output',                         cell_app_output),
+        headed_cell('# Cell 2. Solver 1: Domain propagation',       strip_marker(cell_solver1)),
+        headed_cell('# Cell 3. Solver 2: OR-Tools CP-SAT',          strip_marker(cell_solver2)),
+        headed_cell('# Cell 4. Drawing',                            strip_marker(cell_drawing)),
+        headed_cell('# Cell 5. State',                              strip_marker(cell_state)),
+        headed_cell('# Cell 6. Widgets',                            strip_marker(cell_widgets)),
+        headed_cell('# Cell 7. Callbacks',                          strip_marker(cell_callbacks)),
     ],
     "metadata": {
         "colab": {"provenance": []},
