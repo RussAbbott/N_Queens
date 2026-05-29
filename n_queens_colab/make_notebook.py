@@ -62,8 +62,6 @@ constraint-programming solver (installed automatically on first use).
 
 ---
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/RussAbbott/N_Queens/blob/master/n_queens_colab/n_queens_colab.ipynb)
-
 The Github repo is available [here](https://github.com/RussAbbott/N_Queens).\
 """
 
