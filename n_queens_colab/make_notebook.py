@@ -11,17 +11,20 @@ MARKERS = [
     '# ── State',
     '# ── Widgets',
     '# ── Callbacks',
+    '# ── Run N-Queens',
 ]
 
 positions = [source.index(m) for m in MARKERS]
 
-cell_app_output = source[:positions[0]].rstrip()
-cell_solver1    = source[positions[0]:positions[1]].rstrip()
-cell_solver2    = source[positions[1]:positions[2]].rstrip()
-cell_drawing    = source[positions[2]:positions[3]].rstrip()
-cell_state      = source[positions[3]:positions[4]].rstrip()
-cell_widgets    = source[positions[4]:positions[5]].rstrip()
-cell_callbacks  = source[positions[5]:].strip()
+cell_app_output          = source[:positions[0]].rstrip()
+cell_solver1             = source[positions[0]:positions[1]].rstrip()
+cell_solver2             = source[positions[1]:positions[2]].rstrip()
+cell_drawing             = source[positions[2]:positions[3]].rstrip()
+cell_state               = source[positions[3]:positions[4]].rstrip()
+cell_widgets             = source[positions[4]:positions[5]].rstrip()
+cell_callbacks           = source[positions[5]:positions[6]].rstrip()
+cell_run_n_queens        = source[positions[6]:].rstrip()
+# the last section includes the run_n_queens() call
 
 def strip_marker(src):
     """Strip the first non-empty line (the # ── marker) from a cell's source."""
@@ -47,7 +50,7 @@ def headed_cell(header, src):
 MARKDOWN = """\
 # N-Queens Solver
 
-Click **Run all** on the third line after "+ Code" and "+ Text.
+Click **&emsp;> Run all&emsp;** on the **Commands** line (the third line from the top of this page) after **&emsp;+ Code&emsp;** and **&emsp;+ Text**.
 
 ---
 
@@ -79,6 +82,7 @@ notebook = {
         headed_cell('# Cell 5. State',                              strip_marker(cell_state)),
         headed_cell('# Cell 6. Widgets',                            strip_marker(cell_widgets)),
         headed_cell('# Cell 7. Callbacks',                          strip_marker(cell_callbacks)),
+        headed_cell('# Cell 8. Run N Queens',                       strip_marker(cell_run_n_queens)),
     ],
     "metadata": {
         "colab": {"provenance": []},

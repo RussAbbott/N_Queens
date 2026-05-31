@@ -559,6 +559,9 @@ trace_btn.on_click(on_trace_solve)
 prev_btn.on_click(on_prev)
 next_btn.on_click(on_next)
 
+
+# ── Run N-Queens ─────────────────────────────────────────────────────────────────
+
 def run_n_queens():
     from IPython.display import Javascript, HTML
     # Clear any stale board content and reset UI to a clean state.
@@ -571,18 +574,6 @@ def run_n_queens():
     narrative.value = ''
     state.update({'solutions': [], 'current': 0, 'n': n_input.value,
                   'trace': False, 'trace_states': []})
-
-    # background_color in Layout is overridden by Colab's CSS; inject a
-    # <style> block with !important and also force dark text so labels
-    # remain readable on the coloured backgrounds.
-    display(HTML("""<style>
-    .nq-ctrl { background-color: #d6e8f8 !important; }
-    .nq-narr { background-color: #fdf6d0 !important; }
-    .nq-ctrl .widget-label, .nq-ctrl .widget-readout,
-    .nq-narr .widget-label, .nq-narr .widget-html-content {
-        color: #222222 !important;
-    }
-    </style>"""))
 
     _ROW_W    = '329px'   # natural width of the N / Method row
     _box_style = dict(width='490px', padding='8px 12px', margin='0 0 6px 0',
@@ -612,6 +603,15 @@ def run_n_queens():
 
     n_queens_output.clear_output(wait=True)
     with n_queens_output:
+        # Inject CSS inside the Output widget's context so it reaches the widgets.
+        display(HTML("""<style>
+        .nq-ctrl { background-color: #d6e8f8 !important; }
+        .nq-narr { background-color: #fdf6d0 !important; }
+        .nq-ctrl .widget-label, .nq-ctrl .widget-readout,
+        .nq-narr .widget-label, .nq-narr .widget-html-content {
+            color: #222222 !important;
+        }
+        </style>"""))
         display(widgets.VBox([ctrl_box, narration_box, board_out]))
         # Wire left/right arrow keys to the Prev / Next buttons.
         display(Javascript("""
