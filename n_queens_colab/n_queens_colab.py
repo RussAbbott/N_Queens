@@ -1,8 +1,33 @@
+# ── Markdown ──────────────────────────────────────────────────────────────────
+
+_MARKDOWN_CELL = """\
+# N-Queens Solver
+
+Click **&emsp;> Run all&emsp;** on the **Commands** line (the third line from the top of this page) after **&emsp;+ Code&emsp;** and **&emsp;+ Text**.
+
+---
+
+**Methods available**
+- *In-order, recursion / generator* — assign queens row 0, 1, 2, … in order; \
+domain propagation prunes available columns at each step.
+- *MRV, recursion / generator* — Minimum Remaining Values heuristic: \
+always assign the queen with the fewest remaining legal columns first, \
+detecting dead ends earlier.
+- *OR-Tools CP-SAT* — delegates to Google's industrial-strength \
+constraint-programming solver (installed automatically on first use).
+
+---
+
+The Github repo is available [here](https://github.com/RussAbbott/N_Queens).\
+"""
+
+
+# ── N-Queens output ───────────────────────────────────────────────────────────
+
 import ipywidgets as widgets
 from IPython.display import display, clear_output
 n_queens_output = widgets.Output()
 display(n_queens_output)
-
 
 
 # ── Solver 1: Domain propagation ──────────────────────────────────────────────
