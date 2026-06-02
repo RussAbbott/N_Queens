@@ -403,11 +403,11 @@ trace_btn = widgets.Button(
     description='Solve with Trace', button_style='warning',
     layout=widgets.Layout(width='145px'))
 prev_btn  = widgets.Button(
-    description='◀ Prev', button_style='info',
-    disabled=True, layout=widgets.Layout(width='100px'))
+    description='◀ Prev', button_style='',
+    layout=widgets.Layout(width='100px'))
 next_btn  = widgets.Button(
-    description='Next ▶', button_style='info',
-    disabled=True, layout=widgets.Layout(width='100px'))
+    description='Next ▶', button_style='',
+    layout=widgets.Layout(width='100px'))
 status    = widgets.Label(
     value='Enter N and Method, then press Solve or Solve with Trace.',
     layout=widgets.Layout(width='440px'))
@@ -507,8 +507,14 @@ def refresh():
 def update_nav():
     c     = state['current']
     total = len(state['trace_states']) if state['trace'] else len(state['solutions'])
-    prev_btn.disabled = (c == 0)
-    next_btn.disabled = (c == total - 1)
+    if c == 0:
+        prev_btn.button_style = ''; prev_btn.add_class('nq-nav-inactive')
+    else:
+        prev_btn.button_style = 'info'; prev_btn.remove_class('nq-nav-inactive')
+    if c == total - 1:
+        next_btn.button_style = ''; next_btn.add_class('nq-nav-inactive')
+    else:
+        next_btn.button_style = 'info'; next_btn.remove_class('nq-nav-inactive')
 
 def _do_solve(is_trace):
     n      = n_input.value
@@ -546,38 +552,38 @@ def _do_solve(is_trace):
     if is_trace:
         status.value    = _step_label(0)
         narrative.value = _narrative(0)
-        prev_btn.disabled = True
-        next_btn.disabled = False if trace_steps is None else len(trace_steps) <= 1
     elif solutions:
         status.value    = f'Solution 1 of {len(solutions)}'
         narrative.value = ''
-        prev_btn.disabled = True
-        next_btn.disabled = len(solutions) == 1
     else:
         status.value    = f'No solutions for N = {n}'
         narrative.value = ''
-        prev_btn.disabled = True
-        next_btn.disabled = True
+    update_nav()
     refresh()
 
 def on_solve(_):       _do_solve(False)
 def on_trace_solve(_): _do_solve(True)
 
 def on_prev(_):
+    if state['current'] <= 0:
+        return
     state['current'] -= 1
     c = state['current']
     status.value    = _step_label(c)
     narrative.value = _narrative(c)
-    update_nav()
     refresh()
+    update_nav()
 
 def on_next(_):
+    total = len(state['trace_states']) if state['trace'] else len(state['solutions'])
+    if state['current'] >= total - 1:
+        return
     state['current'] += 1
     c = state['current']
     status.value    = _step_label(c)
     narrative.value = _narrative(c)
-    update_nav()
     refresh()
+    update_nav()
 
 solve_btn.on_click(on_solve)
 trace_btn.on_click(on_trace_solve)
@@ -593,8 +599,8 @@ def run_n_queens():
     with board_out:
         clear_output(wait=True)
         draw_board(None, n_input.value)
-    prev_btn.disabled = True
-    next_btn.disabled = True
+    prev_btn.button_style = ''; prev_btn.add_class('nq-nav-inactive')
+    next_btn.button_style = ''; next_btn.add_class('nq-nav-inactive')
     status.value    = 'Enter N and Method values. Then press Solve or Solve with Trace.'
     narrative.value = ''
     state.update({'solutions': [], 'current': 0, 'n': n_input.value,
@@ -635,6 +641,10 @@ def run_n_queens():
         .nq-ctrl .widget-label, .nq-ctrl .widget-readout,
         .nq-narr .widget-label, .nq-narr .widget-html-content {
             color: #222222 !important;
+        }
+        button.widget-button.nq-nav-inactive {
+            pointer-events: none !important;
+            cursor: default !important;
         }
         </style>"""))
         display(widgets.VBox([ctrl_box, narration_box, board_out]))
