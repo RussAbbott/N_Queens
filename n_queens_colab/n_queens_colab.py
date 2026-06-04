@@ -18,7 +18,7 @@ constraint-programming solver (installed automatically on first use).
 
 ---
 
-The Github repo is available [here](https://github.com/RussAbbott/N_Queens).\
+The Github repo is available [here](https://github.com/RussAbbott/N_Queens).
 """
 
 
@@ -410,10 +410,85 @@ status    = widgets.Label(
 board_out = widgets.Output()
 narrative = widgets.HTML('', layout=widgets.Layout(width='440px'))
 
-
-# ── State and callbacks
-
 state = {'solutions': [], 'current': 0, 'n': 8, 'is_tracing': False, 'trace_steps': []}
+
+
+# ── Initialize UI ─────────────────────────────────────────────────────────────────
+
+def initialize_UI():
+    from IPython.display import Javascript, HTML
+    # Clear any stale board content and reset UI to a clean state.
+    with board_out:
+        clear_output(wait=True)
+        draw_board(None, n_input.value)
+    prev_btn.button_style = ''; prev_btn.add_class('nq-nav-inactive')
+    next_btn.button_style = ''; next_btn.add_class('nq-nav-inactive')
+    status.value    = 'Enter N and Method values. Then press Solve or Solve with Trace.'
+    narrative.value = ''
+    state.update({'solutions': [], 'current': 0, 'n': n_input.value,
+                  'is_tracing': False, 'trace_steps': []})
+
+    _ROW_W    = '329px'   # natural width of the N / Method row
+    _box_style = dict(width='490px', padding='8px 12px', margin='0 0 6px 0',
+                      border_radius='6px', border='1px solid #aaaaaa',
+                      align_items='center')
+
+    ctrl_box = widgets.VBox([
+        widgets.HBox([n_label, n_input, method_label, method_drop],
+                     layout=widgets.Layout(width=_ROW_W)),
+        widgets.HBox([solve_btn, trace_btn],
+                     layout=widgets.Layout(width=_ROW_W,
+                                           justify_content='space-between')),
+    ], layout=widgets.Layout(**_box_style))
+    ctrl_box.add_class('nq-ctrl')
+
+    narration_box = widgets.VBox([
+        widgets.HBox([prev_btn,
+                      widgets.HTML('<div style="text-align:center">'
+                                   '(or left/right arrow keys)</div>',
+                                   layout=widgets.Layout(flex='1')),
+                      next_btn],
+                     layout=widgets.Layout(width='100%')),
+        status,
+        narrative,
+    ], layout=widgets.Layout(**_box_style))
+    narration_box.add_class('nq-narr')
+
+    n_queens_output.clear_output(wait=True)
+    with n_queens_output:
+        # Inject CSS inside the Output widget's context so it reaches the widgets.
+        display(HTML("""<style>
+        .nq-ctrl { background-color: #d6e8f8 !important; }
+        .nq-narr { background-color: #fdf6d0 !important; }
+        .nq-ctrl .widget-label, .nq-ctrl .widget-readout,
+        .nq-narr .widget-label, .nq-narr .widget-html-content {
+            color: #222222 !important;
+        }
+        button.widget-button.nq-nav-inactive {
+            pointer-events: none !important;
+            cursor: default !important;
+        }
+        </style>"""))
+        display(widgets.VBox([ctrl_box, narration_box, board_out]))
+        # Wire left/right arrow keys to the Prev / Next buttons.
+        display(Javascript("""
+        if (window._nq_keydown) document.removeEventListener('keydown', window._nq_keydown);
+        window._nq_keydown = function(e) {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            e.preventDefault();
+            document.querySelectorAll('button.widget-button').forEach(function(btn) {
+                var t = btn.textContent.trim();
+                if (e.key === 'ArrowLeft'  && t.includes('Prev') && !btn.disabled) btn.click();
+                if (e.key === 'ArrowRight' && t.includes('Next') && !btn.disabled) btn.click();
+            });
+        };
+        document.addEventListener('keydown', window._nq_keydown);
+        """))
+
+initialize_UI()
+
+
+# ── State and callbacks ───────────────────────────────────────────────────────
 
 def _step_label(c):
     """Status label for the current step/solution in either mode."""
@@ -587,78 +662,3 @@ solve_btn.on_click(on_solve)
 trace_btn.on_click(on_trace_solve)
 prev_btn.on_click(on_prev)
 next_btn.on_click(on_next)
-
-
-# ── Initialize UI ─────────────────────────────────────────────────────────────────
-
-def initialize_UI():
-    from IPython.display import Javascript, HTML
-    # Clear any stale board content and reset UI to a clean state.
-    with board_out:
-        clear_output(wait=True)
-        draw_board(None, n_input.value)
-    prev_btn.button_style = ''; prev_btn.add_class('nq-nav-inactive')
-    next_btn.button_style = ''; next_btn.add_class('nq-nav-inactive')
-    status.value    = 'Enter N and Method values. Then press Solve or Solve with Trace.'
-    narrative.value = ''
-    state.update({'solutions': [], 'current': 0, 'n': n_input.value,
-                  'is_tracing': False, 'trace_steps': []})
-
-    _ROW_W    = '329px'   # natural width of the N / Method row
-    _box_style = dict(width='490px', padding='8px 12px', margin='0 0 6px 0',
-                      border_radius='6px', border='1px solid #aaaaaa',
-                      align_items='center')
-
-    ctrl_box = widgets.VBox([
-        widgets.HBox([n_label, n_input, method_label, method_drop],
-                     layout=widgets.Layout(width=_ROW_W)),
-        widgets.HBox([solve_btn, trace_btn],
-                     layout=widgets.Layout(width=_ROW_W,
-                                           justify_content='space-between')),
-    ], layout=widgets.Layout(**_box_style))
-    ctrl_box.add_class('nq-ctrl')
-
-    narration_box = widgets.VBox([
-        widgets.HBox([prev_btn,
-                      widgets.HTML('<div style="text-align:center">'
-                                   '(or left/right arrow keys)</div>',
-                                   layout=widgets.Layout(flex='1')),
-                      next_btn],
-                     layout=widgets.Layout(width='100%')),
-        status,
-        narrative,
-    ], layout=widgets.Layout(**_box_style))
-    narration_box.add_class('nq-narr')
-
-    n_queens_output.clear_output(wait=True)
-    with n_queens_output:
-        # Inject CSS inside the Output widget's context so it reaches the widgets.
-        display(HTML("""<style>
-        .nq-ctrl { background-color: #d6e8f8 !important; }
-        .nq-narr { background-color: #fdf6d0 !important; }
-        .nq-ctrl .widget-label, .nq-ctrl .widget-readout,
-        .nq-narr .widget-label, .nq-narr .widget-html-content {
-            color: #222222 !important;
-        }
-        button.widget-button.nq-nav-inactive {
-            pointer-events: none !important;
-            cursor: default !important;
-        }
-        </style>"""))
-        display(widgets.VBox([ctrl_box, narration_box, board_out]))
-        # Wire left/right arrow keys to the Prev / Next buttons.
-        display(Javascript("""
-        if (window._nq_keydown) document.removeEventListener('keydown', window._nq_keydown);
-        window._nq_keydown = function(e) {
-            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-            e.preventDefault();
-            document.querySelectorAll('button.widget-button').forEach(function(btn) {
-                var t = btn.textContent.trim();
-                if (e.key === 'ArrowLeft'  && t.includes('Prev') && !btn.disabled) btn.click();
-                if (e.key === 'ArrowRight' && t.includes('Next') && !btn.disabled) btn.click();
-            });
-        };
-        document.addEventListener('keydown', window._nq_keydown);
-        """))
-
-initialize_UI()
