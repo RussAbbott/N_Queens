@@ -488,7 +488,7 @@ def initialize_UI():
 initialize_UI()
 
 
-# ── State and callbacks ───────────────────────────────────────────────────────
+# ── Callbacks ───────────────────────────────────────────────────────
 
 def _step_label(c):
     """Status label for the current step/solution in either mode."""
