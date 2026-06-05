@@ -9,7 +9,7 @@ Click **&emsp;> Run all&emsp;** on the **Commands** line (the third line from th
 
 **Methods available**
 - *In-order, recursion / generator* — assign queens row 0, 1, 2, … in order; \
-domain propagation prunes available columns at each step.
+constraint propagation prunes available columns at each step.
 - *MRV, recursion / generator* — Minimum Remaining Values heuristic: \
 always assign the queen with the fewest remaining legal columns first, \
 detecting dead ends earlier.
@@ -30,11 +30,11 @@ n_queens_output = widgets.Output()
 display(n_queens_output)
 
 
-# ── Solver 1: Backtracking search with domain propagation ──────────────────────────────────────────────
+# ── Solver 1: Backtracking search with constraint propagation ──────────────────────────────────────────────
 
 def solve_n_queens_propagation(n, method="recursion", strategy="mrv", trace=None):
     """
-    Find all solutions to the N-Queens problem using domain propagation.
+    Find all solutions to the N-Queens problem using constraint propagation.
 
     Each queen is represented as a Queen object whose avail_cols is pruned
     as columns are assigned. New Queen objects are created on each recursive
@@ -410,7 +410,7 @@ status    = widgets.Label(
 board_out = widgets.Output()
 narrative = widgets.HTML('', layout=widgets.Layout(width='440px'))
 
-state = {'solutions': [], 'current': 0, 'n': 8, 'is_tracing': False, 'trace_steps': []}
+state = {'solutions': [], 'current_pos': 0, 'n': 8, 'is_tracing': False, 'trace_steps': []}
 
 
 # ── Initialize UI ─────────────────────────────────────────────────────────────────
@@ -425,7 +425,7 @@ def initialize_UI():
     next_btn.button_style = ''; next_btn.add_class('nq-nav-inactive')
     status.value    = 'Enter N and Method values. Then press Solve or Solve with Trace.'
     narrative.value = ''
-    state.update({'solutions': [], 'current': 0, 'n': n_input.value,
+    state.update({'solutions': [], 'current_pos': 0, 'n': n_input.value,
                   'is_tracing': False, 'trace_steps': []})
 
     _ROW_W    = '329px'   # natural width of the N / Method row
@@ -488,7 +488,62 @@ def initialize_UI():
 initialize_UI()
 
 
-# ── Callbacks ───────────────────────────────────────────────────────
+# ── Solve ─────────────────────────────────────────────────────────────────────
+
+def do_solve(is_tracing):
+    n      = n_input.value
+    method = method_drop.value
+
+    if is_tracing and method == 'cp':
+        status.value    = 'Trace not available for OR-Tools — please choose a propagation method.'
+        narrative.value = ''
+        return
+    if is_tracing and n > 6:
+        status.value    = f'Trace mode: N = {n} may be very large — please set N ≤ 6.'
+        narrative.value = ''
+        return
+
+    trace_steps = []
+
+    if method == 'cp':
+        try:
+            from ortools.sat.python import cp_model as _  # check availability
+        except ImportError:
+            status.value    = 'Installing OR-Tools (first use only) …'
+            narrative.value = ''
+            import subprocess, sys
+            subprocess.run([sys.executable, '-m', 'pip', 'install', 'ortools', '-q'],
+                           capture_output=True)
+        solutions = solve_n_queens_cp(n)
+    else:
+        strategy, m = method.split('-')          # e.g. 'mrv-rec' -> 'mrv', 'rec'
+        full_method  = 'recursion' if m == 'rec' else 'generator'
+        solutions = solve_n_queens_propagation(n, full_method, strategy,
+                                               trace=trace_steps if is_tracing else None)
+
+    state.update({'n': n, 'current_pos': 0, 'solutions': solutions,
+                  'is_tracing': is_tracing, 'trace_steps': trace_steps})
+
+    if is_tracing:
+        status.value    = step_label(0)
+        narrative.value = narrative_text(0)
+    elif solutions:
+        status.value    = f'Solution 1 of {len(solutions)}'
+        narrative.value = ''
+    else:
+        status.value    = f'No solutions for N = {n}'
+        narrative.value = ''
+    update_nav()
+    refresh()
+
+def on_solve(_):       do_solve(False)
+def on_trace_solve(_): do_solve(True)
+
+solve_btn.on_click(on_solve)
+trace_btn.on_click(on_trace_solve)
+
+
+# ── Explore ──────────────────────────────────────────────────────────────────
 
 def step_label(c):
     """Status label for the current step/solution in either mode."""
@@ -570,7 +625,7 @@ def refresh():
     with board_out:
         clear_output(wait=True)
         n  = state['n']
-        c  = state['current']
+        c  = state['current_pos']
         if state['is_tracing'] and state['trace_steps']:
             draw_board(None, n, trace_steps=state['trace_steps'][c])
         else:
@@ -578,7 +633,7 @@ def refresh():
             draw_board(sol[c] if sol else None, n)
 
 def update_nav():
-    c     = state['current']
+    c     = state['current_pos']
     total = len(state['trace_steps']) if state['is_tracing'] else len(state['solutions'])
     if c == 0:
         prev_btn.button_style = ''; prev_btn.add_class('nq-nav-inactive')
@@ -589,59 +644,11 @@ def update_nav():
     else:
         next_btn.button_style = 'info'; next_btn.remove_class('nq-nav-inactive')
 
-def do_solve(is_tracing):
-    n      = n_input.value
-    method = method_drop.value
-
-    if is_tracing and method == 'cp':
-        status.value    = 'Trace not available for OR-Tools — please choose a propagation method.'
-        narrative.value = ''
-        return
-    if is_tracing and n > 6:
-        status.value    = f'Trace mode: N = {n} may be very large — please set N ≤ 6.'
-        narrative.value = ''
-        return
-
-    trace_steps = [] if is_tracing else None
-
-    if method == 'cp':
-        try:
-            from ortools.sat.python import cp_model as _  # check availability
-        except ImportError:
-            status.value    = 'Installing OR-Tools (first use only) …'
-            narrative.value = ''
-            import subprocess, sys
-            subprocess.run([sys.executable, '-m', 'pip', 'install', 'ortools', '-q'],
-                           capture_output=True)
-        solutions = solve_n_queens_cp(n)
-    else:
-        strategy, m = method.split('-')          # e.g. 'mrv-rec' -> 'mrv', 'rec'
-        full_method  = 'recursion' if m == 'rec' else 'generator'
-        solutions = solve_n_queens_propagation(n, full_method, strategy, trace=trace_steps)
-
-    state.update({'n': n, 'current': 0, 'solutions': solutions,
-                  'is_tracing': is_tracing, 'trace_steps': trace_steps or []})
-
-    if is_tracing:
-        status.value    = step_label(0)
-        narrative.value = narrative_text(0)
-    elif solutions:
-        status.value    = f'Solution 1 of {len(solutions)}'
-        narrative.value = ''
-    else:
-        status.value    = f'No solutions for N = {n}'
-        narrative.value = ''
-    update_nav()
-    refresh()
-
-def on_solve(_):       do_solve(False)
-def on_trace_solve(_): do_solve(True)
-
 def on_prev(_):
-    if state['current'] <= 0:
+    if state['current_pos'] <= 0:
         return
-    state['current'] -= 1
-    c = state['current']
+    state['current_pos'] -= 1
+    c = state['current_pos']
     status.value    = step_label(c)
     narrative.value = narrative_text(c)
     refresh()
@@ -649,16 +656,14 @@ def on_prev(_):
 
 def on_next(_):
     total = len(state['trace_steps']) if state['is_tracing'] else len(state['solutions'])
-    if state['current'] >= total - 1:
+    if state['current_pos'] >= total - 1:
         return
-    state['current'] += 1
-    c = state['current']
+    state['current_pos'] += 1
+    c = state['current_pos']
     status.value    = step_label(c)
     narrative.value = narrative_text(c)
     refresh()
     update_nav()
 
-solve_btn.on_click(on_solve)
-trace_btn.on_click(on_trace_solve)
 prev_btn.on_click(on_prev)
 next_btn.on_click(on_next)
