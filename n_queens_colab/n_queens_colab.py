@@ -490,7 +490,7 @@ initialize_UI()
 
 # ── Callbacks ───────────────────────────────────────────────────────
 
-def _step_label(c):
+def step_label(c):
     """Status label for the current step/solution in either mode."""
     if state['is_tracing']:
         total      = len(state['trace_steps'])
@@ -505,7 +505,7 @@ def _step_label(c):
         total = len(state['solutions'])
         return f'Solution {c + 1} of {total}'
 
-def _narrative(c):
+def narrative_text(c):
     """One-line description of the transition that led to trace step c."""
     if not state['is_tracing'] or not state['trace_steps']:
         return ''
@@ -589,7 +589,7 @@ def update_nav():
     else:
         next_btn.button_style = 'info'; next_btn.remove_class('nq-nav-inactive')
 
-def _do_solve(is_tracing):
+def do_solve(is_tracing):
     n      = n_input.value
     method = method_drop.value
 
@@ -623,8 +623,8 @@ def _do_solve(is_tracing):
                   'is_tracing': is_tracing, 'trace_steps': trace_steps or []})
 
     if is_tracing:
-        status.value    = _step_label(0)
-        narrative.value = _narrative(0)
+        status.value    = step_label(0)
+        narrative.value = narrative_text(0)
     elif solutions:
         status.value    = f'Solution 1 of {len(solutions)}'
         narrative.value = ''
@@ -634,16 +634,16 @@ def _do_solve(is_tracing):
     update_nav()
     refresh()
 
-def on_solve(_):       _do_solve(False)
-def on_trace_solve(_): _do_solve(True)
+def on_solve(_):       do_solve(False)
+def on_trace_solve(_): do_solve(True)
 
 def on_prev(_):
     if state['current'] <= 0:
         return
     state['current'] -= 1
     c = state['current']
-    status.value    = _step_label(c)
-    narrative.value = _narrative(c)
+    status.value    = step_label(c)
+    narrative.value = narrative_text(c)
     refresh()
     update_nav()
 
@@ -653,8 +653,8 @@ def on_next(_):
         return
     state['current'] += 1
     c = state['current']
-    status.value    = _step_label(c)
-    narrative.value = _narrative(c)
+    status.value    = step_label(c)
+    narrative.value = narrative_text(c)
     refresh()
     update_nav()
 
