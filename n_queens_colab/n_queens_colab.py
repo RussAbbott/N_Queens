@@ -1,6 +1,5 @@
-# ── Markdown ──────────────────────────────────────────────────────────────────
-
-_MARKDOWN_CELL = """\
+# ── Markdown ────────────────────────────────────────────────────────────────
+MARKDOWN_CELL = """\
 # N-Queens Solver
 
 Click **&emsp;> Run all&emsp;** on the **Commands** line (the third line from the top of this page) after **&emsp;+ Code&emsp;** and **&emsp;+ Text**.
@@ -22,7 +21,7 @@ The Github repo is available [here](https://github.com/RussAbbott/N_Queens).
 """
 
 
-# ── N-Queens output ───────────────────────────────────────────────────────────
+#@title ── N-Queens output ───────────────────────────────────────────────────────────
 
 import ipywidgets as widgets
 from IPython.display import display, clear_output
@@ -30,7 +29,7 @@ n_queens_output = widgets.Output()
 display(n_queens_output)
 
 
-# ── Solver 1: Backtracking search with constraint propagation ──────────────────────────────────────────────
+#@title ── Solver 1: Backtracking search with constraint propagation ──────────────────────────────────────────────
 
 def solve_n_queens_propagation(n, method="recursion", strategy="mrv", trace=None):
     """
@@ -193,7 +192,7 @@ def solve_n_queens_propagation(n, method="recursion", strategy="mrv", trace=None
     return solutions if method == "recursion" else yielded_solutions
 
 
-# ── Solver 2: OR-Tools CP-SAT ─────────────────────────────────────────────────
+#@title ── Solver 2: OR-Tools CP-SAT ─────────────────────────────────────────────────
 
 def solve_n_queens_cp(n):
     """
@@ -266,7 +265,7 @@ def solve_n_queens_cp(n):
     return solutions
 
 
-# ── Draw the board ───────────────────────────────────────────────────────────────────
+#@title ── Draw the board ───────────────────────────────────────────────────────────────────
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -368,7 +367,7 @@ def draw_board(solution, n, trace_steps=None):
     plt.close(fig)
 
 
-# ── Widgets ───────────────────────────────────────────────────────────────────
+#@title ── Widgets ───────────────────────────────────────────────────────────────────
 
 n_label = widgets.Label('N:', layout=widgets.Layout(width='22px'))
 n_input = widgets.BoundedIntText(
@@ -481,7 +480,7 @@ with n_queens_output:
     """))
 
 
-# ── Solve ─────────────────────────────────────────────────────────────────────
+#@title ── Solve ─────────────────────────────────────────────────────────────────────
 
 def do_solve(is_tracing):
     n      = n_input.value
@@ -538,7 +537,7 @@ solve_btn.on_click(on_solve)
 trace_btn.on_click(on_trace_solve)
 
 
-# ── Explore ──────────────────────────────────────────────────────────────────
+#@title ── Explore ──────────────────────────────────────────────────────────────────
 
 def step_label(c):
     """Status label for the current step/solution in either mode."""

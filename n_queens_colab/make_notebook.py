@@ -4,13 +4,13 @@ with open('n_queens_colab.py', 'r', encoding='utf-8') as f:
     source = f.read()
 
 # Discover every  # ── Section name ───  marker and its position.
-_marker_re = re.compile(r'^# ── (.+?)─*$', re.MULTILINE)
-_found     = [(m.group(1).strip(), m.start()) for m in _marker_re.finditer(source)]
+marker_re = re.compile(r'^#(?:@title)? ── (.+?)─*$', re.MULTILINE)
+found     = [(m.group(1).strip(), m.start()) for m in marker_re.finditer(source)]
 
 # Split source into (name, content) pairs.
 sections = []
-for i, (name, pos) in enumerate(_found):
-    end = _found[i + 1][1] if i + 1 < len(_found) else len(source)
+for i, (name, pos) in enumerate(found):
+    end = found[i + 1][1] if i + 1 < len(found) else len(source)
     sections.append((name, source[pos:end].rstrip()))
 
 
@@ -42,23 +42,24 @@ def markdown_cell(src):
 
 
 cells  = []
-cell_n = 0
+cell_nbr = 0
 
 for name, content in sections:
     body = strip_marker(content)
     if name == 'Markdown':
-        # Extract the content of the _MARKDOWN_CELL triple-quoted string.
-        m = re.search(r'_MARKDOWN_CELL\s*=\s*"""\\\n(.*?)"""', body, re.DOTALL)
+        # Extract the content of the MARKDOWN_CELL triple-quoted string.
+        m = re.search(r'MARKDOWN_CELL\s*=\s*"""\\\n(.*?)"""', body, re.DOTALL)
         cells.append(markdown_cell(m.group(1).rstrip() if m else body))
     else:
-        cell_n += 1
-        cells.append(code_cell(f'# Cell {cell_n}. {name}\n\n{body}'))
+        cell_nbr += 1
+        cells.append(markdown_cell(f'## {name}'))
+        cells.append(code_cell(f'# Cell {cell_nbr}. {name}\n\n{body}'))
 
 
 notebook = {
     "cells": cells,
     "metadata": {
-        "colab": {"provenance": []},
+        "colab": {"provenance": [], "toc_visible": True},
         "kernelspec": {
             "display_name": "Python 3",
             "language": "python",
