@@ -369,6 +369,12 @@ def draw_board(solution, n, trace_steps=None):
 
 #@title ── Widgets ───────────────────────────────────────────────────────────────────
 
+try:
+    ctrl_box.children    = ()
+    narration_box.children = ()
+except NameError:
+    pass
+
 n_label = widgets.Label('N:', layout=widgets.Layout(width='22px'))
 n_input = widgets.BoundedIntText(
     value=8, min=1, max=20, description='',
