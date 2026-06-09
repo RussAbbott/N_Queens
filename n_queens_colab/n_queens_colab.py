@@ -465,18 +465,21 @@ with n_queens_output:
     </style>"""))
     display(widgets.VBox([ctrl_box, narration_box, board_out]))
     # Wire left/right arrow keys to the Prev / Next buttons.
+    # Guard with a document flag so the listener is added exactly once per
+    # document context, even if Colab re-executes this Javascript block.
     display(Javascript("""
-    if (window.nqKeydown) document.removeEventListener('keydown', window.nqKeydown);
-    window.nqKeydown = function(e) {
-        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-        e.preventDefault();
-        document.querySelectorAll('button.widget-button').forEach(function(btn) {
-            var t = btn.textContent.trim();
-            if (e.key === 'ArrowLeft'  && t.includes('Prev')) btn.click();
-            if (e.key === 'ArrowRight' && t.includes('Next')) btn.click();
+    if (!document._nqListenerRegistered) {
+        document._nqListenerRegistered = true;
+        document.addEventListener('keydown', function(e) {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            e.preventDefault();
+            document.querySelectorAll('button.widget-button').forEach(function(btn) {
+                var t = btn.textContent.trim();
+                if (e.key === 'ArrowLeft'  && t.includes('Prev')) btn.click();
+                if (e.key === 'ArrowRight' && t.includes('Next')) btn.click();
+            });
         });
-    };
-    document.addEventListener('keydown', window.nqKeydown);
+    }
     """))
 
 

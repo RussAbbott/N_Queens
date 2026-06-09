@@ -52,14 +52,13 @@ for name, content in sections:
         cells.append(markdown_cell(m.group(1).rstrip() if m else body))
     else:
         cell_nbr += 1
-        cells.append(markdown_cell(f'## {name}'))
         cells.append(code_cell(f'# Cell {cell_nbr}. {name}\n\n{body}'))
 
 
 notebook = {
     "cells": cells,
     "metadata": {
-        "colab": {"provenance": [], "toc_visible": True},
+        "colab": {"provenance": []},
         "kernelspec": {
             "display_name": "Python 3",
             "language": "python",
