@@ -466,18 +466,15 @@ with n_queens_output:
     display(widgets.VBox([ctrl_box, narration_box, board_out]))
     # Wire left/right arrow keys to the Prev / Next buttons.
     display(Javascript("""
-    if (!document.nqListenerRegistered) {
-        document.nqListenerRegistered = true;
-        function nqKeydown(e) {
-            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-            e.preventDefault();
-            var prev = document.querySelector('button.nq-prev');
-            var next = document.querySelector('button.nq-next');
-            if (e.key === 'ArrowLeft'  && prev) prev.click();
-            if (e.key === 'ArrowRight' && next) next.click();
-        }
-        document.addEventListener('keydown', nqKeydown);
+    function nqKeydown(e) {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        var prev = document.querySelector('button.nq-prev');
+        var next = document.querySelector('button.nq-next');
+        if (e.key === 'ArrowLeft'  && prev) prev.click();
+        if (e.key === 'ArrowRight' && next) next.click();
     }
+    document.addEventListener('keydown', nqKeydown);
     """))
 
 
@@ -540,8 +537,6 @@ trace_btn.on_click(on_trace_solve)
 
 #@title ── Explore ──────────────────────────────────────────────────────────────────
 
-# import time as time
-# nav_last = 0.0          # monotonic timestamp of the last accepted nav event
 
 def step_label(c):
     """Status label for the current step/solution in either mode."""
@@ -643,11 +638,6 @@ def update_nav():
         next_btn.button_style = 'info'; next_btn.remove_class('nq-nav-inactive')
 
 def on_prev(_):
-    # global nav_last
-    # now = time.monotonic()
-    # if now - nav_last < 0.15:
-    #     return
-    # nav_last = now
     if state['current_pos'] <= 0:
         return
     state['current_pos'] -= 1
@@ -658,11 +648,6 @@ def on_prev(_):
     update_nav()
 
 def on_next(_):
-    # global nav_last
-    # now = time.monotonic()
-    # if now - nav_last < 0.15:
-    #     return
-    # nav_last = now
     total = len(state['trace_steps']) if state['is_tracing'] else len(state['solutions'])
     if state['current_pos'] >= total - 1:
         return
