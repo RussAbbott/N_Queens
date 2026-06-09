@@ -471,8 +471,12 @@ with n_queens_output:
         function nqKeydown(e) {
             if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
             e.preventDefault();
-            var prev = document.querySelector('button.nq-prev');
-            var next = document.querySelector('button.nq-next');
+            var prevAll = document.querySelectorAll('button.nq-prev');
+            var nextAll = document.querySelectorAll('button.nq-next');
+            console.log('[nq] nq-prev buttons in DOM:', prevAll.length,
+                        '  nq-next buttons in DOM:', nextAll.length);
+            var prev = prevAll[0];
+            var next = nextAll[0];
             if (e.key === 'ArrowLeft'  && prev) prev.click();
             if (e.key === 'ArrowRight' && next) next.click();
         }
