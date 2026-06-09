@@ -417,8 +417,8 @@ from IPython.display import Javascript, HTML
 with board_out:
     clear_output(wait=True)
     draw_board(None, n_input.value)
-prev_btn.button_style = ''; prev_btn.add_class('nq-nav-inactive')
-next_btn.button_style = ''; next_btn.add_class('nq-nav-inactive')
+prev_btn.button_style = ''; prev_btn.add_class('nq-nav-inactive'); prev_btn.add_class('nq-prev')
+next_btn.button_style = ''; next_btn.add_class('nq-nav-inactive'); next_btn.add_class('nq-next')
 status.value    = 'Enter N and Method values. Then press Solve or Solve with Trace.'
 narrative.value = ''
 
@@ -465,19 +465,16 @@ with n_queens_output:
     </style>"""))
     display(widgets.VBox([ctrl_box, narration_box, board_out]))
     # Wire left/right arrow keys to the Prev / Next buttons.
-    # Guard with a document flag so the listener is added exactly once per
-    # document context, even if Colab re-executes this Javascript block.
     display(Javascript("""
     if (!document.nqListenerRegistered) {
         document.nqListenerRegistered = true;
         document.addEventListener('keydown', function(e) {
             if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
             e.preventDefault();
-            document.querySelectorAll('button.widget-button').forEach(function(btn) {
-                var t = btn.textContent.trim();
-                if (e.key === 'ArrowLeft'  && t.includes('Prev')) btn.click();
-                if (e.key === 'ArrowRight' && t.includes('Next')) btn.click();
-            });
+            var prev = document.querySelector('button.nq-prev');
+            var next = document.querySelector('button.nq-next');
+            if (e.key === 'ArrowLeft'  && prev) prev.click();
+            if (e.key === 'ArrowRight' && next) next.click();
         });
     }
     """))
@@ -542,8 +539,8 @@ trace_btn.on_click(on_trace_solve)
 
 #@title ── Explore ──────────────────────────────────────────────────────────────────
 
-import time as _time
-_nav_last = 0.0          # monotonic timestamp of the last accepted nav event
+# import time as time
+# nav_last = 0.0          # monotonic timestamp of the last accepted nav event
 
 def step_label(c):
     """Status label for the current step/solution in either mode."""
@@ -645,11 +642,11 @@ def update_nav():
         next_btn.button_style = 'info'; next_btn.remove_class('nq-nav-inactive')
 
 def on_prev(_):
-    global _nav_last
-    now = _time.monotonic()
-    if now - _nav_last < 0.15:
-        return
-    _nav_last = now
+    # global nav_last
+    # now = time.monotonic()
+    # if now - nav_last < 0.15:
+    #     return
+    # nav_last = now
     if state['current_pos'] <= 0:
         return
     state['current_pos'] -= 1
@@ -660,11 +657,11 @@ def on_prev(_):
     update_nav()
 
 def on_next(_):
-    global _nav_last
-    now = _time.monotonic()
-    if now - _nav_last < 0.15:
-        return
-    _nav_last = now
+    # global nav_last
+    # now = time.monotonic()
+    # if now - nav_last < 0.15:
+    #     return
+    # nav_last = now
     total = len(state['trace_steps']) if state['is_tracing'] else len(state['solutions'])
     if state['current_pos'] >= total - 1:
         return
