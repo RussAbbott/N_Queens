@@ -468,14 +468,15 @@ with n_queens_output:
     display(Javascript("""
     if (!document.nqListenerRegistered) {
         document.nqListenerRegistered = true;
-        document.addEventListener('keydown', function(e) {
+        function nqKeydown(e) {
             if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
             e.preventDefault();
             var prev = document.querySelector('button.nq-prev');
             var next = document.querySelector('button.nq-next');
             if (e.key === 'ArrowLeft'  && prev) prev.click();
             if (e.key === 'ArrowRight' && next) next.click();
-        });
+        }
+        document.addEventListener('keydown', nqKeydown);
     }
     """))
 
