@@ -369,6 +369,7 @@ def draw_board(solution, n, trace_steps=None):
 
 #@title ── Widgets ───────────────────────────────────────────────────────────────────
 
+# On the first run, these widgets are not yet defined. Hence the try/except.
 try:
     ctrl_box.children    = ()
     narration_box.children = ()
@@ -668,3 +669,12 @@ prev_btn._click_handlers.callbacks.clear()
 next_btn._click_handlers.callbacks.clear()
 prev_btn.on_click(on_prev)
 next_btn.on_click(on_next)
+
+
+#@title ── Resources ────────────────────────────────────────────────────────────────
+
+MARKDOWN_CELL = """\
+## Resources
+
+Russ Abbott wrote the solvers; Claude Code wrote the GUI.
+"""

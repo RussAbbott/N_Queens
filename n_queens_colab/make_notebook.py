@@ -46,10 +46,9 @@ cell_nbr = 0
 
 for name, content in sections:
     body = strip_marker(content)
-    if name == 'Markdown':
-        # Extract the content of the MARKDOWN_CELL triple-quoted string.
-        m = re.search(r'MARKDOWN_CELL\s*=\s*"""\\\n(.*?)"""', body, re.DOTALL)
-        cells.append(markdown_cell(m.group(1).rstrip() if m else body))
+    m = re.search(r'MARKDOWN_CELL\s*=\s*"""\\\n(.*?)"""', body, re.DOTALL)
+    if m:
+        cells.append(markdown_cell(m.group(1).rstrip()))
     else:
         cell_nbr += 1
         cells.append(markdown_cell(f'## {name}'))
