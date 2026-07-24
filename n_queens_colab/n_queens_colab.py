@@ -29,6 +29,33 @@ n_queens_output = widgets.Output()
 display(n_queens_output)
 
 
+#@title ── Utilities ─────────────────────────────────────────────────────────────────
+
+def queens_conflict(r1, c1, r2, c2):
+    """True if queens at (r1,c1) and (r2,c2) attack each other (same row, col, or diagonal)."""
+    return r1 == r2 or c1 == c2 or abs(r1 - r2) == abs(c1 - c2)
+
+def cells_attacked(row, col, n):
+    """
+    All board cells attacked by a queen at (row, col), excluding its own cell.
+    Returns a frozenset of (r, c) pairs covering the queen's row, column, and diagonals.
+    """
+    attacked = set()
+    # Add all cells in the same column and diagonals.
+    for r in range(n):
+        if r == row:
+            continue
+        diff = abs(r - row)
+        attacked.add((r, col))                             # same column
+        if col + diff < n:  attacked.add((r, col + diff))  # diagonal right
+        if col - diff >= 0: attacked.add((r, col - diff))  # diagonal left
+    # Add all cells in the same row.
+    for c in range(n):
+        if c != col: 
+            attacked.add((row, c))                 # same row
+    return frozenset(attacked)
+
+
 #@title ── Solver 1: Backtracking search with constraint propagation ──────────────────────────────────────────────
 
 def solve_n_queens_propagation(n, method="recursion", strategy="mrv", trace=None):
@@ -152,7 +179,7 @@ def solve_n_queens_propagation(n, method="recursion", strategy="mrv", trace=None
 
             for i, col in enumerate(sorted_avail):
                 current_visited_cols = loop_tried + next_queen.visited_cols
-                remaining       = frozenset(sorted_avail[i + 1:])
+                remaining            = frozenset(sorted_avail[i + 1:])
 
                 new_unassigned = constrain_all(unassigned_queens - {next_queen},
                                                col,
@@ -192,7 +219,308 @@ def solve_n_queens_propagation(n, method="recursion", strategy="mrv", trace=None
     return solutions if method == "recursion" else yielded_solutions
 
 
-#@title ── Solver 2: OR-Tools CP-SAT ─────────────────────────────────────────────────
+# #@title ── Solver 2: OR-Tools CP-SAT ─────────────────────────────────────────────────
+
+# def solve_n_queens_cp(n):
+#     """
+#     Find all solutions to the N-Queens problem using the OR-Tools CP-SAT solver.
+#     OR-Tools is installed automatically on first use if not already present.
+
+#     A problem specification, called a Model, consists of decision variables and
+#     constraints. A decision variable is a variable that can take on values from
+#     a specified domain. A constraint is a relation among decision variables that
+#     must hold.
+
+#     For this problem, n decision variables represent the positions of n queens.
+#     These are stored in the list queens, where queens[r] is the column of the
+#     queen in row r as in the previous solutions.
+
+#     In this problem, the only constraint type is all_different(List), which
+#     requires that all decisions variables in the list assume distinct values.
+#     For example, all_different(queens) requires that all the queens be different.
+
+#     Given a problem specification, the solver uses constraint programming
+#     techniques to search the solution space for valid assignments.
+
+#     The implementation below is straightforward, but the library offers many
+#     knobs to turn for performance tuning.
+
+#     Parameters:
+#         n: int
+#             Number of queens (and board size).
+
+#     Returns:
+#         List[List[int]]: list of solutions, each a list of n column indices
+#         where solution[r] is the column of the queen in row r.
+#     """
+#     from ortools.sat.python import cp_model
+#     model = cp_model.CpModel()
+
+#     # Each queens[r] is a decision variable representing the column of the queen
+#     # in row r. Its domain is 0..n-1. The string "qr" is a label used in solver
+#     # diagnostics.
+#     queens = [model.new_int_var(0, n - 1, f"q{r}") for r in range(n)]
+
+#     # No two queens in the same column.
+#     model.add_all_different(queens)
+
+#     # No two queens on the same diagonal. Two queens at (r1,c1) and (r2,c2)
+#     # share a diagonal when |c1-c2| == |r1-r2|, i.e. when c+r or c-r is equal.
+#     # Requiring all col+row values to be distinct blocks one diagonal direction,
+#     # and requiring all col-row values to be distinct blocks the other.
+#     model.add_all_different([queens[r] + r for r in range(n)])
+#     model.add_all_different([queens[r] - r for r in range(n)])
+
+#     solver = cp_model.CpSolver()
+#     solutions = []
+#     solver.parameters.enumerate_all_solutions = True
+
+#     # CpSolverSolutionCallback is an OR-Tools class whose instances are expected
+#     # to implement the on_solution_callback() method--which is called whenever a
+#     # solution is found. Such an instance has access to the values of the decision
+#     # variables via the value() method. Those values are the found solution, i.e.,
+#     # they satisfy the specified constraints.
+#     #
+#     # Our SolutionCollector is a subclass of CpSolverSolutionCallback. Its
+#     # on_solution_callback() method adds each found solution to the list of
+#     # solutions.
+#     class SolutionCollector(cp_model.CpSolverSolutionCallback):
+#         def on_solution_callback(self):
+#             solutions.append([self.value(queens[r]) for r in range(n)])
+
+#     solver.solve(model, SolutionCollector())
+#     return solutions
+
+
+#@title ── Solver 2: Lean proof-building ─────────────────────────────────────────────
+
+import random
+
+class SubSol:
+    """
+    One sub-solution in the Lean proof-building pool.
+
+    An axiom is a single queen with no parents.
+    Every other SubSol was produced by merging two compatible parent SubSols.
+
+    positions — frozenset of (row, col): board cells occupied by queens in this sub-solution
+    exc       — frozenset of (row, col): all cells attacked by those queens (hence forbidden)
+    parent_1  — SubSol | None: first  parent sub-solution (None for axioms)
+    parent_2  — SubSol | None: second parent sub-solution (None for axioms)
+    """
+    def __init__(self, positions: frozenset, exc: frozenset,
+                 parent_1=None, parent_2=None):
+        self.positions = positions
+        self.exc       = exc
+        self.parent_1  = parent_1
+        self.parent_2  = parent_2
+
+    def can_combine(self, other: 'SubSol') -> bool:
+        """True iff no queen in self conflicts with any queen in other."""
+        for r1, c1 in self.positions:
+            for r2, c2 in other.positions:
+                if queens_conflict(r1, c1, r2, c2):
+                    return False
+        return True
+
+    def merge(self, other: 'SubSol') -> 'SubSol':
+        """Return a new SubSol combining self and other, recording both as parents."""
+        positions = self.positions | other.positions
+        exc       = (self.exc | other.exc) - positions
+        return SubSol(positions, exc, parent_1=self, parent_2=other)
+
+    def is_prunable(self, n: int) -> bool:
+        """
+        True if this sub-solution is a dead end: some free row or free column
+        has no safe cell remaining (every intersection is excluded).
+        """
+        free_rows = [r for r in range(n) if not any(r == row for row, _ in self.positions)]
+        free_cols = [c for c in range(n) if not any(c == col for _, col in self.positions)]
+        for r in free_rows:
+            if all((r, c) in self.exc for c in free_cols): return True
+        for c in free_cols:
+            if all((r, c) in self.exc for r in free_rows): return True
+        return False
+
+
+def solve_n_queens_lean(n: int, trace: list | None):
+    """
+    Pool-based Lean-style proof-building solver.
+
+    The pool starts with N² axiom SubSols — one per board cell, each holding
+    a single queen position.  At each step we pick two SubSols at random and
+    try to merge them.  A merge is accepted when:
+      - the two queen-sets are conflict-free (can_combine), and
+      - the combined queen-set has not been seen before, and
+      - the merged SubSol is not prunable (no row or column is fully blocked).
+
+    Accepted merges are appended to the pool (old sub-solutions are never
+    removed), so the pool grows monotonically until a complete n-queen
+    SubSol is assembled or progress stalls.
+
+    Each accepted SubSol records its two parents, building a derivation tree
+    in memory.  When a solution is found, build_steps() walks that tree
+    in post-order and appends one trace step per merge so the UI can replay
+    the construction from the first pair up to the complete solution.
+
+    Returns:
+        (solution, trace) — solution is list[int] (col per row) or None on failure.
+    """
+    # Growing list of all SubSols available for combining.
+    # The pool is never trimmed — old entries remain as merge candidates.
+    pool: list[SubSol] = []
+
+    # Set of position-frozensets already accepted or pruned.
+    # Prevents re-exploring the same queen arrangement via different merge paths.
+    seen: set[frozenset] = set()
+
+    # ── Axioms ──────────────────────────────────────────────────────────────
+    # Seed the pool with N² single-queen SubSols, one per board cell.
+    # These are the "atoms" of the proof; they have no parents.
+    for row in range(n):
+        for col in range(n):
+            cell = frozenset({(row, col)})
+            exc  = cells_attacked(row, col, n)
+            pool.append(SubSol(cell, exc))   # parent_1 = parent_2 = None → axiom
+            seen.add(cell)
+
+    # ── Derivation-tree traversal ────────────────────────────────────────────
+    def build_steps(root_ss: SubSol) -> list[SubSol]:
+        """
+        Post-order DFS of the derivation tree rooted at root_ss.
+
+        Returns every non-axiom SubSol in construction order: both parents of a
+        node always appear before the node itself.  Axioms (parent_1 is None) are
+        leaves and are skipped — they contribute no displayable step.
+
+        Because two different nodes can share a parent (a sub-solution may be merged
+        more than once), we deduplicate by object identity with a visited set.
+        """
+        result:  list[SubSol] = []
+        visited: set[int]     = set()
+
+        def dfs(ss: SubSol) -> None:
+            if id(ss) in visited:
+                return
+            visited.add(id(ss))
+            if ss.parent_1 is None:
+                return               # axiom leaf — no step to record
+            dfs(ss.parent_1)
+            dfs(ss.parent_2)
+            result.append(ss)
+
+        dfs(root_ss)
+        return result
+
+    # ── Main merge loop ──────────────────────────────────────────────────────
+    stall     = 0
+    MAX_STALL = 8000   # give up after this many consecutive failed attempts
+    seq       = 0      # monotone counter; each accepted merge gets seq stamped on it
+
+    while stall < MAX_STALL:
+        if len(pool) < 2:
+            break
+
+        # Pick two SubSols at random; order doesn't matter for merge().
+        a, b = random.sample(pool, 2)
+
+        if not a.can_combine(b):
+            stall += 1
+            continue
+
+        merged_positions: frozenset = a.positions | b.positions
+        if merged_positions in seen:
+            stall += 1
+            continue
+
+        merged: SubSol = a.merge(b)   # links parent_1=a, parent_2=b
+        if merged.is_prunable(n):
+            seen.add(merged_positions)   # mark dead end so we skip it in future
+            stall += 1
+            continue
+
+        # Merge accepted: stamp with sequence number, add to pool, reset stall.
+        seq += 1
+        merged.seq = seq
+        seen.add(merged_positions)
+        pool.append(merged)
+        stall = 0
+
+        if len(merged.positions) == n:
+            # ── Solution found ───────────────────────────────────────────────
+            sol: list[int] = [0] * n
+            for r, c in merged.positions:
+                sol[r] = c
+
+            if trace is not None:
+                # Build the chronological construction sequence from the derivation tree.
+                # steps[0] is the first pair created; steps[-1] is the complete solution.
+                steps: list[SubSol] = build_steps(merged)
+                total = len(steps)
+
+                # active: non-singleton SubSols that have been created but not yet
+                # consumed by a larger merge.  Tracked by object identity.
+                active:    list[SubSol] = []
+                active_ids: set[int]   = set()
+
+                for step_num, ss in enumerate(steps, start=1):
+                    # Consume parents if they were non-singletons in the active set.
+                    for parent in (ss.parent_1, ss.parent_2):
+                        if id(parent) in active_ids:
+                            active_ids.discard(id(parent))
+                            active.remove(parent)
+                    active.append(ss)
+                    active_ids.add(id(ss))
+
+                    # Grayed-out cells = union of exc from the active sub-solutions only.
+                    displayed_positions: frozenset = frozenset().union(
+                        *(s.positions for s in active))
+
+                    # Pool count: non-singleton solver pool members that existed
+                    # at this point in solving (seq <= current step's seq) and are
+                    # still compatible with the currently displayed queens.
+                    pool_count = sum(
+                        1 for s in pool
+                        if len(s.positions) >= 2
+                        and s.seq <= ss.seq
+                        and not any(
+                            queens_conflict(r1, c1, r2, c2)
+                            for (r1, c1) in s.positions
+                            for (r2, c2) in displayed_positions
+                            if (r1, c1) != (r2, c2)
+                        )
+                    )
+
+                    # Describe what kind of merge just happened.
+                    p1_size = len(ss.parent_1.positions)
+                    p2_size = len(ss.parent_2.positions)
+                    if p1_size == 1 and p2_size == 1:
+                        step_desc = 'New pair'
+                    elif p1_size == 1 or p2_size == 1:
+                        step_desc = 'Extended a sub-solution'
+                    else:
+                        step_desc = 'Merged two sub-solutions'
+
+                    if step_num < total:
+                        label = f'{step_desc}  —  {pool_count} compatible in pool'
+                    else:
+                        label = f'{step_desc}  —  Solution found!'
+
+                    trace.append({
+                        'type':     'lean_step',
+                        'active':   list(active),   # list[SubSol] currently displayed
+                        'step_num': step_num,
+                        'total':    total,
+                        'n':        n,
+                        'label':    label,
+                    })
+
+            return sol, trace
+
+    return None, trace
+
+
+#@title ── Solver 3: OR-Tools CP-SAT ─────────────────────────────────────────────────
 
 def solve_n_queens_cp(n):
     """
@@ -281,16 +609,18 @@ def draw_board(solution, n, trace_steps=None):
     Normal mode (trace_steps is None):
         solution — list of column indices (solution[row] = col), or None for blank.
 
-    Trace mode (trace_steps is a dict):
+    Propagation trace mode (trace_steps has 'assigned'/'unassigned' keys):
         'assigned' : list of (row, col, avail_cols, visited_cols) tuples
-            col       — current queen position        → ♛
-            avail_cols — frozenset of cols still to try on backtrack
-                         → green +1, +2, … in sorted(avail_cols) order
-            visited_cols   — list of previously tried cols, most recent first
-                         → red  -1, -2, … in order
-
+            col          — current queen position             → ♛
+            avail_cols   — cols still to try on backtrack     → green +1, +2, …
+            visited_cols — previously tried cols              → blue  -1, -2, …
         Numbers appear only in rows with a placed queen.
-        Unassigned rows show a plain board square.
+
+    Lean trace mode (trace_steps has type 'lean_step'):
+        active — list of SubSol objects currently active (created, not yet consumed).
+        Queens within each sub-solution are connected by arcs in row order.
+        Each sub-solution gets a distinct arc color.
+        Grayed-out cells are those attacked by the active sub-solutions only.
     """
     fig, ax = plt.subplots(figsize=(5, 5))
     fig.patch.set_facecolor('#ecf0f1')
@@ -310,7 +640,34 @@ def draw_board(solution, n, trace_steps=None):
             sq_color = LIGHT_SQ if (row + col) % 2 == 0 else DARK_SQ
             ax.add_patch(patches.Rectangle((col, n - 1 - row), 1, 1, color=sq_color))
 
-    if trace_steps is not None:
+    if trace_steps is not None and trace_steps.get('type') == 'lean_step':
+        # ── Lean step: chronological construction of the solution ────────────
+        active = trace_steps['active']   # list[SubSol] currently active
+
+        # Grey overlay: only cells attacked by the active sub-solutions.
+        all_excluded = set().union(*(ss.exc for ss in active))
+        for r, c in all_excluded:
+            ax.add_patch(patches.Rectangle((c, n - 1 - r), 1, 1,
+                         facecolor='#555555', alpha=0.35, zorder=2))
+
+        # Each active sub-solution gets a color keyed to its seq number so
+        # the same sub-solution keeps the same color across all display steps.
+        arc_colors = ['navy', 'darkred', 'darkgreen', 'purple',
+                      'darkorange', 'teal', 'saddlebrown', 'indigo']
+        for ss in active:
+            color = arc_colors[ss.seq % len(arc_colors)]
+            sorted_positions = sorted(ss.positions, key=lambda q: q[0])
+            # Arc: straight line between consecutive cell centres (c+0.5, n-0.5-r).
+            for (r1, c1), (r2, c2) in zip(sorted_positions, sorted_positions[1:]):
+                ax.plot([c1 + 0.5, c2 + 0.5], [n - 0.5 - r1, n - 0.5 - r2],
+                        color=color, linewidth=2, alpha=0.75, zorder=3)
+            for r, c in ss.positions:
+                ax.text(c + 0.5, n - 0.5 - r, '♛',
+                        ha='center', va='center', fontsize=queen_fs,
+                        color=QUEEN_FG, zorder=4)
+
+    elif trace_steps is not None:
+        # ── Propagation trace step ───────────────────────────────────────────
         assigned  = trace_steps['assigned']    # [(row, col, avail_cols, visited_cols), ...]
         avail_map = trace_steps['unassigned']  # {row: frozenset}
 
@@ -353,6 +710,7 @@ def draw_board(solution, n, trace_steps=None):
                 ax.text(jc + 0.5, n - 0.5 - q_row, f'-{k}',
                         ha='center', va='center', fontsize=number_fs,
                         color='blue')
+
     elif solution is not None:
         for row in range(n):
             ax.text(solution[row] + 0.5, n - 0.5 - row, '♛',
@@ -388,6 +746,7 @@ method_options = [
     ('MRV, recursion',       'mrv-rec'),
     ('MRV, generator',       'mrv-gen'),
     ('OR-Tools CP-SAT',      'cp'),
+    ('Lean proof-building',  'lean'),
 ]
 
 method_label = widgets.Label('Method:', layout=widgets.Layout(width='55px', margin='0 0 0 20px'))
@@ -495,8 +854,12 @@ def do_solve(is_tracing):
         status.value    = 'Trace not available for OR-Tools — please choose a propagation method.'
         narrative.value = ''
         return
-    if is_tracing and n > 6:
+    if is_tracing and n > 6 and method != 'lean':
         status.value    = f'Trace mode: N = {n} may be very large — please set N ≤ 6.'
+        narrative.value = ''
+        return
+    if is_tracing and n > 12 and method == 'lean':
+        status.value    = f'Lean trace: N = {n} may be slow — please set N ≤ 12.'
         narrative.value = ''
         return
 
@@ -512,6 +875,9 @@ def do_solve(is_tracing):
             subprocess.run([sys.executable, '-m', 'pip', 'install', 'ortools', '-q'],
                            capture_output=True)
         solutions = solve_n_queens_cp(n)
+    elif method == 'lean':
+        sol, _ = solve_n_queens_lean(n, trace_steps if is_tracing else None)
+        solutions = [sol] if sol is not None else []
     else:
         strategy, m = method.split('-')          # e.g. 'mrv-rec' -> 'mrv', 'rec'
         full_method  = 'recursion' if m == 'rec' else 'generator'
@@ -521,9 +887,12 @@ def do_solve(is_tracing):
     state.update({'n': n, 'current_pos': 0, 'solutions': solutions,
                   'is_tracing': is_tracing, 'trace_steps': trace_steps})
 
+    # Lean trace starts at step 0 (first pair); the user navigates forward to the solution.
+
     if is_tracing:
-        status.value    = step_label(0)
-        narrative.value = narrative_text(0)
+        c = state['current_pos']
+        status.value    = step_label(c)
+        narrative.value = narrative_text(c)
     elif solutions:
         status.value    = f'Solution 1 of {len(solutions)}'
         narrative.value = ''
@@ -548,12 +917,15 @@ trace_btn.on_click(on_trace_solve)
 def step_label(c):
     """Status label for the current step/solution in either mode."""
     if state['is_tracing']:
-        total      = len(state['trace_steps'])
-        n_sols     = len(state['solutions'])
-        sols_so_far = sum(
-            1 for t in state['trace_steps'][:c + 1]
-            if not t.get('dead_end') and not t['unassigned']
-        )
+        total  = len(state['trace_steps'])
+        n_sols = len(state['solutions'])
+        ts     = state['trace_steps'][c]
+        if ts.get('type') == 'lean_step':
+            return f'Step {ts["step_num"]} of {ts["total"]}'
+        else:
+            # Propagation trace: count fully-assigned non-dead-end steps.
+            sols_so_far = sum(1 for t in state['trace_steps'][:c + 1]
+                              if not t.get('dead_end') and not t['unassigned'])
         s = '' if n_sols == 1 else 's'
         return f' Step {c + 1} of {total}  ({sols_so_far} of {n_sols} solution{s})'
     else:
@@ -564,7 +936,9 @@ def narrative_text(c):
     """One-line description of the transition that led to trace step c."""
     if not state['is_tracing'] or not state['trace_steps']:
         return ''
-    ts   = state['trace_steps'][c]
+    ts = state['trace_steps'][c]
+    if ts.get('type') == 'lean_step':
+        return ts['label']   # pre-computed in solve_n_queens_lean
     curr = {row: col for row, col, _, _ in ts['assigned']}
 
     if not ts['unassigned'] and not ts.get('dead_end'):
