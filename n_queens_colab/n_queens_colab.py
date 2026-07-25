@@ -806,7 +806,8 @@ LEAN_DEFS_HTML = (
     '<b>Lemma (merge):</b> If A and B are compatible SubSols, then A&thinsp;&cup;&thinsp;B is a SubSol.'
     '</div>'
 )
-lean_defs_box = widgets.HTML('', layout=widgets.Layout(width='490px', display='none'))
+lean_defs_box  = widgets.HTML('', layout=widgets.Layout(width='490px', display='none'))
+lean_note_box  = widgets.HTML('', layout=widgets.Layout(width='490px', display='none'))
 
 
 from IPython.display import Javascript, HTML
@@ -860,7 +861,7 @@ with n_queens_output:
         cursor: default !important;
     }
     </style>"""))
-    display(widgets.VBox([ctrl_box, narration_box, lean_defs_box, board_out]))
+    display(widgets.VBox([ctrl_box, board_out, narration_box, lean_note_box, lean_defs_box]))
     # Wire left/right arrow keys to the Prev / Next buttons.
     display(Javascript("""
     function nqKeydown(e) {
@@ -921,9 +922,15 @@ def do_solve(is_tracing):
     if is_tracing and method == 'lean' and trace_steps:
         lean_defs_box.value          = LEAN_DEFS_HTML
         lean_defs_box.layout.display = ''
+        lean_note_box.value          = ('<div style="font-size:11px;color:#555;'
+                                        'text-align:right;padding:0 4px 2px 0;">'
+                                        'Definitions in the box below.</div>')
+        lean_note_box.layout.display = ''
     else:
         lean_defs_box.value          = ''
         lean_defs_box.layout.display = 'none'
+        lean_note_box.value          = ''
+        lean_note_box.layout.display = 'none'
 
     # Lean trace starts at step 0 (first pair); the user navigates forward to the solution.
 
