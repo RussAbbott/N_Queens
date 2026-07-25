@@ -977,8 +977,7 @@ def narrative_text(c):
     ts = state['trace_steps'][c]
     if ts.get('type') == 'lean_step':
         return (ts['label'] +
-                '<br><span style="color:#777;font-size:11px;font-style:italic">'
-                'Definitions are in the box below.</span>')
+                '<hr style="margin:6px 0;">Definitions are in the box below.')
     curr = {row: col for row, col, _, _ in ts['assigned']}
 
     if not ts['unassigned'] and not ts.get('dead_end'):
