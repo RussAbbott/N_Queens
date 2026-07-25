@@ -491,20 +491,30 @@ def solve_n_queens_lean(n: int, trace: list | None):
                         )
                     )
 
-                    # Describe what kind of merge just happened.
                     p1_size = len(ss.parent_1.positions)
                     p2_size = len(ss.parent_2.positions)
-                    if p1_size == 1 and p2_size == 1:
-                        step_desc = 'New pair'
-                    elif p1_size == 1 or p2_size == 1:
-                        step_desc = 'Extended a sub-solution'
-                    else:
-                        step_desc = 'Merged two sub-solutions'
-
+                    result_size = len(ss.positions)
                     if step_num < total:
-                        label = f'{step_desc}  —  {pool_count} compatible in pool'
+                        label = (
+                            f'Merge of A ({p1_size}-queen) and B ({p2_size}-queen) '
+                            f'→ {result_size}-queen SubSol, verified by:<br>'
+                            f'&nbsp;&nbsp;a) A and B are compatible: '
+                            f'no position in A attacks any position in B.<br>'
+                            f'&nbsp;&nbsp;b) Result = A ∪ B, nonAttacking '
+                            f'by the merge lemma.<br>'
+                            f'<span style="color:#777">({pool_count} compatible '
+                            f'sub-solutions in pool)</span>'
+                        )
                     else:
-                        label = f'{step_desc}  —  Solution found!'
+                        label = (
+                            f'<b>Solution found!</b>&nbsp; '
+                            f'Merge of A ({p1_size}-queen) and B ({p2_size}-queen) '
+                            f'→ {result_size}-queen SubSol.<br>'
+                            f'&nbsp;&nbsp;a) A and B are compatible: '
+                            f'no position in A attacks any position in B.<br>'
+                            f'&nbsp;&nbsp;b) Result = A ∪ B — all {result_size} queens '
+                            f'placed, nonAttacking by the merge lemma.'
+                        )
 
                     trace.append({
                         'type':     'lean_step',
@@ -777,6 +787,27 @@ narrative = widgets.HTML('', layout=widgets.Layout(width='440px'))
 
 state = {'solutions': [], 'current_pos': 0, 'n': 8, 'is_tracing': False, 'trace_steps': []}
 
+LEAN_DEFS_HTML = (
+    '<div style="font-family:monospace;font-size:12px;line-height:1.8;color:#222;'
+    'background:#e8f5e9;border:1px solid #aaaaaa;border-radius:6px;'
+    'padding:8px 12px;margin:0 0 6px 0;">'
+    '<b>Definitions and lemmas used in this proof:</b><br>'
+    '<b>position:</b> a (row,&thinsp;col) pair identifying a square on the board.<br>'
+    '<b>attack(p,&thinsp;q&thinsp;:&thinsp;positions):</b> p and q share a row, column, or diagonal.<br>'
+    '<b>nonAttacking(S&thinsp;:&thinsp;set of positions):</b> no two distinct members of S attack each other.<br>'
+    '&nbsp;&nbsp;&nbsp;&nbsp;&forall;&thinsp;p,&thinsp;q&thinsp;&isin;&thinsp;S,&nbsp;'
+    'p&thinsp;&ne;&thinsp;q&nbsp;&rarr;&nbsp;&not;attack(p,&thinsp;q)<br>'
+    '<b>SubSol:</b> a set S of positions together with a proof that S is nonAttacking.<br>'
+    '<b>Lemma (singleton):</b> For any position p, {p} is nonAttacking. A lone queen attacks nothing.<br>'
+    '<b>Lemma (singleton SubSol):</b> For any position p, {p} is a SubSol.<br>'
+    '<b>compatible(A,&thinsp;B&thinsp;:&thinsp;SubSols):</b> no member of A attacks any member of B.<br>'
+    '&nbsp;&nbsp;&nbsp;&nbsp;&forall;&thinsp;p&thinsp;&isin;&thinsp;A,&nbsp;'
+    '&forall;&thinsp;q&thinsp;&isin;&thinsp;B,&nbsp;&not;attack(p,&thinsp;q)<br>'
+    '<b>Lemma (merge):</b> If A and B are compatible SubSols, then A&thinsp;&cup;&thinsp;B is a SubSol.'
+    '</div>'
+)
+lean_defs_box = widgets.HTML('', layout=widgets.Layout(width='490px', display='none'))
+
 
 from IPython.display import Javascript, HTML
 
@@ -829,7 +860,7 @@ with n_queens_output:
         cursor: default !important;
     }
     </style>"""))
-    display(widgets.VBox([ctrl_box, narration_box, board_out]))
+    display(widgets.VBox([ctrl_box, narration_box, lean_defs_box, board_out]))
     # Wire left/right arrow keys to the Prev / Next buttons.
     display(Javascript("""
     function nqKeydown(e) {
@@ -886,6 +917,13 @@ def do_solve(is_tracing):
 
     state.update({'n': n, 'current_pos': 0, 'solutions': solutions,
                   'is_tracing': is_tracing, 'trace_steps': trace_steps})
+
+    if is_tracing and method == 'lean' and trace_steps:
+        lean_defs_box.value          = LEAN_DEFS_HTML
+        lean_defs_box.layout.display = ''
+    else:
+        lean_defs_box.value          = ''
+        lean_defs_box.layout.display = 'none'
 
     # Lean trace starts at step 0 (first pair); the user navigates forward to the solution.
 
