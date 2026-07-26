@@ -128,10 +128,10 @@ theorem canCombine_iff_compatible (s t : SubSol) :
   constructor
   · intro h p hp q hq
     have hq_notexc := h q hq
-    push_neg at hq_notexc
+    push Not at hq_notexc
     exact hq_notexc.2 p hp
   · intro h p hp
-    push_neg
+    push Not
     exact ⟨fun hps => (h p hps p hp) (attack_self p),
            fun q hqs => h q hqs p hp⟩
 
