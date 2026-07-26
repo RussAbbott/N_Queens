@@ -806,7 +806,7 @@ LEAN_DEFS_HTML = (
     '<b>Lemma (merge):</b> If A and B are compatible SubSols, then A&thinsp;&cup;&thinsp;B is a SubSol.'
     '</div>'
 )
-lean_defs_box = widgets.HTML('', layout=widgets.Layout(width='330px', display='none'))
+lean_defs_box = widgets.HTML('', layout=widgets.Layout(width='410px', display='none'))
 
 
 from IPython.display import Javascript, HTML
@@ -820,8 +820,8 @@ status.value    = 'Enter N and Method values. Then press Solve or Solve with Tra
 narrative.value = ''
 
 ROW_W    = '329px'   # natural width of the N / Method row
-SIDE_W   = '330px'   # right-panel width (narration + defs boxes)
-FULL_W   = '750px'   # board (~400px) + gap (20px) + SIDE_W
+SIDE_W   = '410px'   # right-panel width (narration + defs boxes)
+FULL_W   = '830px'   # board (~400px) + gap (20px) + SIDE_W
 
 ctrl_box = widgets.VBox([
     widgets.HBox([n_label, n_input, method_label, method_drop],
