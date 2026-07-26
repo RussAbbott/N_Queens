@@ -632,7 +632,7 @@ def draw_board(solution, n, trace_steps=None):
         Each sub-solution gets a distinct arc color.
         Grayed-out cells are those attacked by the active sub-solutions only.
     """
-    fig, ax = plt.subplots(figsize=(5, 5))
+    fig, ax = plt.subplots(figsize=(4, 4))
     fig.patch.set_facecolor('#ecf0f1')
 
     queen_fs  = max(8, int(280 / n))
@@ -781,9 +781,9 @@ next_btn  = widgets.Button(
     layout=widgets.Layout(width='100px'))
 status    = widgets.Label(
     value='Enter N and Method, then press Solve or Solve with Trace.',
-    layout=widgets.Layout(width='440px'))
+    layout=widgets.Layout(width='100%'))
 board_out = widgets.Output()
-narrative = widgets.HTML('', layout=widgets.Layout(width='440px'))
+narrative = widgets.HTML('', layout=widgets.Layout(width='100%'))
 
 state = {'solutions': [], 'current_pos': 0, 'n': 8, 'is_tracing': False, 'trace_steps': []}
 
@@ -806,7 +806,7 @@ LEAN_DEFS_HTML = (
     '<b>Lemma (merge):</b> If A and B are compatible SubSols, then A&thinsp;&cup;&thinsp;B is a SubSol.'
     '</div>'
 )
-lean_defs_box = widgets.HTML('', layout=widgets.Layout(width='490px', display='none'))
+lean_defs_box = widgets.HTML('', layout=widgets.Layout(width='284px', display='none'))
 
 
 from IPython.display import Javascript, HTML
@@ -820,9 +820,8 @@ status.value    = 'Enter N and Method values. Then press Solve or Solve with Tra
 narrative.value = ''
 
 ROW_W    = '329px'   # natural width of the N / Method row
-box_style = dict(width='490px', padding='8px 12px', margin='0 0 6px 0',
-                 border_radius='6px', border='1px solid #aaaaaa',
-                 align_items='center')
+SIDE_W   = '284px'   # right-panel width (narration + defs boxes)
+FULL_W   = '704px'   # board (~400px) + gap (20px) + SIDE_W
 
 ctrl_box = widgets.VBox([
     widgets.HBox([n_label, n_input, method_label, method_drop],
@@ -830,7 +829,9 @@ ctrl_box = widgets.VBox([
     widgets.HBox([solve_btn, trace_btn],
                  layout=widgets.Layout(width=ROW_W,
                                        justify_content='space-between')),
-], layout=widgets.Layout(**box_style))
+], layout=widgets.Layout(width=FULL_W, padding='8px 12px', margin='0 0 6px 0',
+                         border_radius='6px', border='1px solid #aaaaaa',
+                         align_items='center'))
 ctrl_box.add_class('nq-ctrl')
 
 narration_box = widgets.VBox([
@@ -842,7 +843,9 @@ narration_box = widgets.VBox([
                  layout=widgets.Layout(width='100%')),
     status,
     narrative,
-], layout=widgets.Layout(**box_style))
+], layout=widgets.Layout(width=SIDE_W, padding='8px 12px', margin='0 0 6px 0',
+                         border_radius='6px', border='1px solid #aaaaaa',
+                         align_items='center'))
 narration_box.add_class('nq-narr')
 
 n_queens_output.clear_output(wait=True)
@@ -860,7 +863,13 @@ with n_queens_output:
         cursor: default !important;
     }
     </style>"""))
-    display(widgets.VBox([ctrl_box, board_out, narration_box, lean_defs_box]))
+    right_panel = widgets.VBox([narration_box, lean_defs_box],
+                               layout=widgets.Layout(width=SIDE_W, gap='6px'))
+    display(widgets.VBox([ctrl_box,
+                          widgets.HBox([board_out, right_panel],
+                                       layout=widgets.Layout(
+                                           width=FULL_W, gap='20px',
+                                           align_items='flex-start'))]))
     # Wire left/right arrow keys to the Prev / Next buttons.
     display(Javascript("""
     function nqKeydown(e) {
