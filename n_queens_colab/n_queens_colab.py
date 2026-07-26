@@ -661,9 +661,8 @@ def run_benchmark():
         print('\nStopped early — the plot cell will use data collected so far.')
     print(f'\nDone: {len(bm_data)} N-values in {time.time() - t0:.1f}s')
 
-print('Benchmark: steps to solution vs N\n'
-      '(interrupt with Ctrl-C at any time; partial results still plot)\n')
-run_benchmark()
+print('Call run_benchmark() to start.\n'
+      'Interrupt with Ctrl-C at any time; partial results still plot.\n')
 
 
 #@title ── Benchmark: Iterative Repair — plot ───────────────────────────────────────────────
