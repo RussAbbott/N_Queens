@@ -868,9 +868,10 @@ with n_queens_output:
     display(widgets.VBox([ctrl_box,
                           widgets.HBox([board_out, right_panel],
                                        layout=widgets.Layout(
+                                           width=FULL_W,
+                                           justify_content='center',
                                            gap='20px',
-                                           align_items='flex-start'))],
-                         layout=widgets.Layout(align_items='center')))
+                                           align_items='flex-start'))]))
     # Wire left/right arrow keys to the Prev / Next buttons.
     display(Javascript("""
     function nqKeydown(e) {
