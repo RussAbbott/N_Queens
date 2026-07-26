@@ -22,17 +22,13 @@ class SubSol:
         self.parent_2  = parent_2
 
     def can_combine(self, other: 'SubSol') -> bool:
-        """True iff no queen in self conflicts with any queen in other."""
-        for r1, c1 in self.positions:
-            for r2, c2 in other.positions:
-                if queens_conflict(r1, c1, r2, c2):
-                    return False
-        return True
+        """True iff no queen in self occupies or attacks any position in other."""
+        return self.exc.isdisjoint(other.positions)
 
     def merge(self, other: 'SubSol') -> 'SubSol':
         """Return a new SubSol combining self and other, recording both as parents."""
         positions = self.positions | other.positions
-        exc       = (self.exc | other.exc) - positions
+        exc       = self.exc | other.exc   # own positions already in each parent's exc
         return SubSol(positions, exc, parent_1=self, parent_2=other)
 
     def is_prunable(self, n: int) -> bool:
@@ -40,8 +36,12 @@ class SubSol:
         True if this sub-solution is a dead end: some free row or free column
         has no safe cell remaining (every intersection is excluded).
         """
-        free_rows = [r for r in range(n) if not any(r == row for row, _ in self.positions)]
-        free_cols = [c for c in range(n) if not any(c == col for _, col in self.positions)]
+        if len(self.exc) == n * n:
+            return True
+        placed_rows = {row for row, _ in self.positions}
+        placed_cols = {col for _, col in self.positions}
+        free_rows = [r for r in range(n) if r not in placed_rows]
+        free_cols = [c for c in range(n) if c not in placed_cols]
         for r in free_rows:
             if all((r, c) in self.exc for c in free_cols): return True
         for c in free_cols:
@@ -86,7 +86,7 @@ def solve_n_queens_lean(n: int, trace: list | None):
     for row in range(n):
         for col in range(n):
             cell = frozenset({(row, col)})
-            exc  = cells_attacked(row, col, n)
+            exc  = cells_attacked(row, col, n) | cell   # include own position
             pool.append(SubSol(cell, exc))   # parent_1 = parent_2 = None → axiom
             seen.add(cell)
 
