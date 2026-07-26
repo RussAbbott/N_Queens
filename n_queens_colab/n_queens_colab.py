@@ -499,7 +499,7 @@ def solve_n_queens_lean(n: int, trace: list | None):
                             f'Merge of A ({p1_size}-queen) and B ({p2_size}-queen) '
                             f'→ {result_size}-queen SubSol, verified by:<br>'
                             f'&nbsp;&nbsp;a) A and B are compatible: '
-                            f'no position in A attacks any position in B.<br>'
+                            f'no position in A attacks any position in B, and vice versa.<br>'
                             f'&nbsp;&nbsp;b) Result = A ∪ B, nonAttacking '
                             f'by the merge lemma.<br>'
                             f'<span style="color:#777">({pool_count} compatible '
@@ -511,7 +511,7 @@ def solve_n_queens_lean(n: int, trace: list | None):
                             f'Merge of A ({p1_size}-queen) and B ({p2_size}-queen) '
                             f'→ {result_size}-queen SubSol.<br>'
                             f'&nbsp;&nbsp;a) A and B are compatible: '
-                            f'no position in A attacks any position in B.<br>'
+                            f'no position in A attacks any position in B, and vice versa.<br>'
                             f'&nbsp;&nbsp;b) Result = A ∪ B — all {result_size} queens '
                             f'placed, nonAttacking by the merge lemma.'
                         )
@@ -806,7 +806,7 @@ LEAN_DEFS_HTML = (
     '<b>Lemma (merge):</b> If A and B are compatible SubSols, then A&thinsp;&cup;&thinsp;B is a SubSol.'
     '</div>'
 )
-lean_defs_box = widgets.HTML('', layout=widgets.Layout(width='284px', display='none'))
+lean_defs_box = widgets.HTML('', layout=widgets.Layout(width='330px', display='none'))
 
 
 from IPython.display import Javascript, HTML
@@ -820,8 +820,8 @@ status.value    = 'Enter N and Method values. Then press Solve or Solve with Tra
 narrative.value = ''
 
 ROW_W    = '329px'   # natural width of the N / Method row
-SIDE_W   = '284px'   # right-panel width (narration + defs boxes)
-FULL_W   = '704px'   # board (~400px) + gap (20px) + SIDE_W
+SIDE_W   = '330px'   # right-panel width (narration + defs boxes)
+FULL_W   = '750px'   # board (~400px) + gap (20px) + SIDE_W
 
 ctrl_box = widgets.VBox([
     widgets.HBox([n_label, n_input, method_label, method_drop],
