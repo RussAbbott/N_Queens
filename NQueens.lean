@@ -29,6 +29,9 @@ theorem attack_symm {p q : Nat × Nat} (h : attack p q) : attack q p := by
   · exact Or.inr (Or.inr (Or.inl h.symm))
   · exact Or.inr (Or.inr (Or.inr h.symm))
 
+/-- Every square attacks itself (same row and column). -/
+lemma attack_self (p : Nat × Nat) : attack p p := Or.inl rfl
+
 /-- A set of positions is nonAttacking if no two distinct members attack each other. -/
 def nonAttacking (s : Finset (Nat × Nat)) : Prop :=
   ∀ p ∈ s, ∀ q ∈ s, p ≠ q → ¬ attack p q
@@ -100,6 +103,43 @@ lemma compatible_union_nonAttacking (s t : SubSol) (h : compatible s t) :
 /-- A full solution: a SubSol that places exactly `n` queens (one per row). -/
 def isSolution (n : Nat) (s : SubSol) : Prop :=
   s.positions.card = n
+
+-- ── Excluded set ─────────────────────────────────────────────────────────────
+
+/--
+Cell `p` is excluded by SubSol `s` if it is occupied by or attacked by one of s's queens.
+This is the Lean counterpart of the Python `exc` field carried by each SubSol.
+-/
+def inExc (s : SubSol) (p : Nat × Nat) : Prop :=
+  p ∈ s.positions ∨ ∃ q ∈ s.positions, attack q p
+
+/--
+One-sided compatibility check: no position of `t` falls in the excluded zone of `s`.
+Because `attack` is symmetric, checking one direction is sufficient.
+This corresponds to the Python `can_combine` check `self.exc.isdisjoint(other.positions)`.
+-/
+def canCombine (s t : SubSol) : Prop :=
+  ∀ p ∈ t.positions, ¬ inExc s p
+
+/-- `canCombine s t` is equivalent to `compatible s t`. -/
+theorem canCombine_iff_compatible (s t : SubSol) :
+    canCombine s t ↔ compatible s t := by
+  unfold canCombine compatible inExc
+  constructor
+  · intro h p hp q hq
+    have hq_notexc := h q hq
+    push_neg at hq_notexc
+    exact hq_notexc.2 p hp
+  · intro h p hp
+    push_neg
+    exact ⟨fun hps => (h p hps p hp) (attack_self p),
+           fun q hqs => h q hqs p hp⟩
+
+/-- The excluded zone of a merged SubSol is the union of the two parents' excluded zones. -/
+lemma inExc_merge (s t : SubSol) (h : compatible s t) (p : Nat × Nat) :
+    inExc (merge s t h) p ↔ inExc s p ∨ inExc t p := by
+  simp [inExc, merge, Finset.mem_union]
+  tauto
 
 #print axioms merge
 
