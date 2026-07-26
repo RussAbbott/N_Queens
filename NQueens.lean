@@ -138,8 +138,19 @@ theorem canCombine_iff_compatible (s t : SubSol) :
 /-- The excluded zone of a merged SubSol is the union of the two parents' excluded zones. -/
 lemma inExc_merge (s t : SubSol) (h : compatible s t) (p : Nat × Nat) :
     inExc (merge s t h) p ↔ inExc s p ∨ inExc t p := by
-  simp [inExc, merge, Finset.mem_union]
-  tauto
+  simp only [inExc, merge, Finset.mem_union]
+  constructor
+  · rintro ((hs | ht) | ⟨a, b, h2, hatk⟩)
+    · exact Or.inl (Or.inl hs)
+    · exact Or.inr (Or.inl ht)
+    · rcases h2 with hs | ht
+      · exact Or.inl (Or.inr ⟨a, b, hs, hatk⟩)
+      · exact Or.inr (Or.inr ⟨a, b, ht, hatk⟩)
+  · rintro ((hs | ⟨a, b, hs, hatk⟩) | ht | ⟨a, b, ht, hatk⟩)
+    · exact Or.inl (Or.inl hs)
+    · exact Or.inr ⟨a, b, Or.inl hs, hatk⟩
+    · exact Or.inl (Or.inr ht)
+    · exact Or.inr ⟨a, b, Or.inr ht, hatk⟩
 
 #print axioms merge
 
