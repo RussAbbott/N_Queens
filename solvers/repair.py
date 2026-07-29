@@ -101,7 +101,6 @@ def solve_n_queens_repair(n, trace=None, max_restarts=100):
 
                 queens[row] = random.choice(best_cols) if best_cols else old_col
                 prev_move = (row, queens[row])
-                seen.clear()
                 if trace is not None and len(trace) < MAX_TRACE:
                     trace.append({
                         'type':      'repair_step',
