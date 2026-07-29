@@ -28,11 +28,12 @@ def conflict_summary(queens, n):
     return ', '.join(parts) + f' conflict{s}'
 
 
-def escape_cycle(queens, attacks, max_att, prev_move, n, trace, MAX_TRACE, restart):
+def escape_cycle(queens, attacks, max_att, prev_move, n, seen, trace, MAX_TRACE, restart):
     """
-    Pick the single-queen move that maximises total conflict reduction,
-    excluding the immediately preceding move to avoid an immediate re-cycle.
-    Modifies queens in place.  Returns the new prev_move tuple.
+    Pick the single-queen move that maximises total conflict reduction among
+    destinations not already in seen, excluding the immediately preceding move.
+    Modifies queens in place.  Returns the new prev_move tuple, or None if
+    every candidate destination is already in seen (caller should restart).
     """
     current_total = sum(attacks) // 2
     esc_row     = random.choice([r for r, a in enumerate(attacks) if a == max_att])
@@ -45,6 +46,9 @@ def escape_cycle(queens, attacks, max_att, prev_move, n, trace, MAX_TRACE, resta
         if col == esc_old_col or col == excluded:
             continue
         queens[esc_row] = col
+        if tuple(queens) in seen:
+            queens[esc_row] = esc_old_col
+            continue
         new_total = sum(repair_attacks(queens, r, queens[r], n) for r in range(n)) // 2
         queens[esc_row] = esc_old_col
         delta = current_total - new_total
@@ -54,9 +58,9 @@ def escape_cycle(queens, attacks, max_att, prev_move, n, trace, MAX_TRACE, resta
             esc_cols.append(col)
 
     if not esc_cols:
-        esc_cols = [col for col in range(n) if col != esc_old_col]
+        return None  # no unseen escape exists; caller should restart
 
-    queens[esc_row] = random.choice(esc_cols) if esc_cols else esc_old_col
+    queens[esc_row] = random.choice(esc_cols)
     if trace is not None and len(trace) < MAX_TRACE:
         trace.append({
             'type':      'repair_step',
@@ -116,7 +120,9 @@ def repair_restart(queens, n, max_steps, MAX_TRACE, trace, restart):
         if tuple(queens) in seen:
             queens[row] = old_col
             prev_move = escape_cycle(queens, attacks, max_att, prev_move,
-                                      n, trace, MAX_TRACE, restart)
+                                      n, seen, trace, MAX_TRACE, restart)
+            if prev_move is None:
+                break  # no unseen escape; trigger restart
         else:
             prev_move = (row, queens[row])
             if trace is not None and len(trace) < MAX_TRACE and queens[row] != old_col:
