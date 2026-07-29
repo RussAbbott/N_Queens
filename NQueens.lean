@@ -6,7 +6,8 @@ Lean 4 formalization of the N-Queens `SubSol` / `merge` model.
 Core concepts:
   - `attack`        : two squares share a row, column, or diagonal
   - `nonAttacking`  : a set in which no two members attack each other
-  - `SubSol`        : a set of positions proven to be nonAttacking
+  - `attackedBy`    : the set of cells attacked by a set of queens
+  - `SubSol`        : positions + excluded zone + nonAttacking proof
   - `compatible`    : two SubSols with no cross-attacks
   - `merge`         : combines two compatible SubSols into one
 -/
@@ -29,7 +30,7 @@ theorem attack_symm {p q : Nat × Nat} (h : attack p q) : attack q p := by
   · exact Or.inr (Or.inr (Or.inl h.symm))
   · exact Or.inr (Or.inr (Or.inr h.symm))
 
-/-- Every square attacks itself (same row and column). -/
+/-- Every square attacks itself. -/
 lemma attack_self (p : Nat × Nat) : attack p p := Or.inl rfl
 
 /-- A set of positions is nonAttacking if no two distinct members attack each other. -/
@@ -39,34 +40,61 @@ def nonAttacking (s : Finset (Nat × Nat)) : Prop :=
 instance (s : Finset (Nat × Nat)) : Decidable (nonAttacking s) := by
   unfold nonAttacking; infer_instance
 
+/-- The set of all cells attacked by any queen in S. -/
+def attackedBy (S : Finset (Nat × Nat)) : Set (Nat × Nat) :=
+  {p | ∃ q ∈ S, attack q p}
+
+/-- attackedBy distributes over union: f(S₁ ∪ S₂) = f(S₁) ∪ f(S₂). -/
+lemma attackedBy_union (s t : Finset (Nat × Nat)) :
+    attackedBy (s ∪ t) = attackedBy s ∪ attackedBy t := by
+  ext p
+  simp only [attackedBy, Set.mem_union, Finset.mem_union]
+  constructor
+  · rintro ⟨q, hq | hq, hatk⟩
+    · exact Or.inl ⟨q, hq, hatk⟩
+    · exact Or.inr ⟨q, hq, hatk⟩
+  · rintro (⟨q, hq, hatk⟩ | ⟨q, hq, hatk⟩)
+    · exact ⟨q, Or.inl hq, hatk⟩
+    · exact ⟨q, Or.inr hq, hatk⟩
+
 /--
-A `SubSol` is a nonAttacking set of positions — the positions bundled with
-the proof that they are jointly placeable.  Writing `p ∈ s` (via the
-`Membership` instance below) means `p` is one of the positions in `s`.
+A `SubSol` is a nonAttacking set of positions bundled with its excluded zone.
+- `positions` : the queens placed so far
+- `proof`     : they are jointly nonAttacking
+- `exc`       : the set of cells occupied by or attacked by any queen in `positions`
+- `exc_spec`  : exc equals exactly the positions union the cells they attack
+
+This mirrors the Python `SubSol` class, which carries both `positions` and `exc`.
 -/
 structure SubSol where
   positions : Finset (Nat × Nat)
   proof     : nonAttacking positions
+  exc       : Set (Nat × Nat)
+  exc_spec  : exc = ↑positions ∪ attackedBy positions
 
 /-- Allows writing `p ∈ s` for a `SubSol s`. -/
 private def SubSol.mem (s : SubSol) (p : Nat × Nat) : Prop := p ∈ s.positions
 instance : Membership (Nat × Nat) SubSol := ⟨SubSol.mem⟩
 
-/-- Lemma: any singleton set is nonAttacking (a single queen attacks no other). -/
+/-- Any singleton set is nonAttacking. -/
 lemma singleton_nonAttacking (p : Nat × Nat) : nonAttacking {p} := by
   intro a ha b hb _
   simp only [Finset.mem_singleton] at ha hb
   subst ha; subst hb
   tauto
 
-/-- For every position `p`, the singleton `{p}` is a valid SubSol. -/
-def singleton_subSol (p : Nat × Nat) : SubSol :=
-  ⟨{p}, singleton_nonAttacking p⟩
+/--
+The singleton `{p}` as a SubSol.  Its excluded zone is defined to be exactly
+`↑{p} ∪ attackedBy {p}`, so `exc_spec` holds by `rfl`.
+-/
+def singleton_subSol (p : Nat × Nat) : SubSol where
+  positions := {p}
+  proof     := singleton_nonAttacking p
+  exc       := ↑({p} : Finset (Nat × Nat)) ∪ attackedBy {p}
+  exc_spec  := rfl
 
 /--
 Two SubSols are compatible if no member of one attacks any member of the other.
-Note: if the same position appeared in both, `attack p p` would hold (same row
-and column), so compatibility already rules that out.
 -/
 def compatible (s t : SubSol) : Prop :=
   ∀ p ∈ s.positions, ∀ q ∈ t.positions, ¬ attack p q
@@ -78,12 +106,18 @@ instance (s t : SubSol) : Decidable (compatible s t) := by
   unfold compatible; infer_instance
 
 /--
-`merge` is the key inference rule: two compatible SubSols can be joined into
-one.  The proof below verifies that the union is nonAttacking.
+`merge` combines two compatible SubSols.  The excluded zone of the result is
+`s.exc ∪ t.exc`, mirroring the Python `exc = self.exc | other.exc`.
+
+The `exc_spec` proof uses:
+  1. the parents' `exc_spec` to rewrite `s.exc` and `t.exc`
+  2. `Finset.coe_union` : ↑(s ∪ t) = ↑s ∪ ↑t
+  3. `attackedBy_union` : attackedBy (s ∪ t) = attackedBy s ∪ attackedBy t
+  4. set algebra        : (A ∪ B) ∪ (C ∪ D) = (A ∪ C) ∪ (B ∪ D)
 -/
 def merge (s t : SubSol) (h : compatible s t) : SubSol where
   positions := s.positions ∪ t.positions
-  proof := by
+  proof     := by
     intro p hp q hq hpq
     simp only [Finset.mem_union] at hp hq
     rcases hp with hp | hp <;> rcases hq with hq | hq
@@ -91,32 +125,33 @@ def merge (s t : SubSol) (h : compatible s t) : SubSol where
     · exact h p hp q hq
     · exact fun hc => h q hq p hp (attack_symm hc)
     · exact t.proof p hp q hq hpq
+  exc       := s.exc ∪ t.exc
+  exc_spec  := by
+    rw [s.exc_spec, t.exc_spec, Finset.coe_union, attackedBy_union]
+    ext p; simp only [Set.mem_union]; tauto
 
-/--
-Lemma: if two SubSols are compatible, their union is nonAttacking.
-(This is the central fact that justifies `merge`.)
--/
+/-- The union of two compatible SubSols' positions is nonAttacking. -/
 lemma compatible_union_nonAttacking (s t : SubSol) (h : compatible s t) :
     nonAttacking (s.positions ∪ t.positions) :=
   (merge s t h).proof
 
-/-- A full solution: a SubSol that places exactly `n` queens (one per row). -/
+/-- A full solution places exactly `n` queens. -/
 def isSolution (n : Nat) (s : SubSol) : Prop :=
   s.positions.card = n
 
 -- ── Excluded set ─────────────────────────────────────────────────────────────
 
-/--
-Cell `p` is excluded by SubSol `s` if it is occupied by or attacked by one of s's queens.
-This is the Lean counterpart of the Python `exc` field carried by each SubSol.
--/
-def inExc (s : SubSol) (p : Nat × Nat) : Prop :=
-  p ∈ s.positions ∨ ∃ q ∈ s.positions, attack q p
+/-- Cell `p` is excluded by SubSol `s` if it is in `s`'s stored excluded zone. -/
+def inExc (s : SubSol) (p : Nat × Nat) : Prop := p ∈ s.exc
+
+/-- Bridge: membership in exc is equivalent to being occupied or attacked. -/
+lemma mem_exc_iff (s : SubSol) (p : Nat × Nat) :
+    p ∈ s.exc ↔ p ∈ s.positions ∨ ∃ q ∈ s.positions, attack q p := by
+  simp [s.exc_spec, attackedBy, Set.mem_union]
 
 /--
 One-sided compatibility check: no position of `t` falls in the excluded zone of `s`.
-Because `attack` is symmetric, checking one direction is sufficient.
-This corresponds to the Python `can_combine` check `self.exc.isdisjoint(other.positions)`.
+Corresponds to the Python `self.exc.isdisjoint(other.positions)`.
 -/
 def canCombine (s t : SubSol) : Prop :=
   ∀ p ∈ t.positions, ¬ inExc s p
@@ -124,41 +159,30 @@ def canCombine (s t : SubSol) : Prop :=
 /-- `canCombine s t` is equivalent to `compatible s t`. -/
 theorem canCombine_iff_compatible (s t : SubSol) :
     canCombine s t ↔ compatible s t := by
-  unfold canCombine compatible inExc
+  simp only [canCombine, inExc, compatible]
   constructor
   · intro h p hp q hq
-    have hq_notexc := h q hq
+    have hq_notexc : ¬ (q ∈ s.exc) := h q hq
+    rw [mem_exc_iff] at hq_notexc
     push Not at hq_notexc
     exact hq_notexc.2 p hp
-  · intro h p hp
+  · intro h q hq
+    rw [mem_exc_iff]
     push Not
-    exact ⟨fun hps => (h p hps p hp) (attack_self p),
-           fun q hqs => h q hqs p hp⟩
+    exact ⟨fun hqs => (h q hqs q hq) (attack_self q),
+           fun p hps => h p hps q hq⟩
 
-/-- The excluded zone of a merged SubSol is the union of the two parents' excluded zones. -/
+/-- The excluded zone of a merge is the union of the parents' zones (definitionally). -/
 lemma inExc_merge (s t : SubSol) (h : compatible s t) (p : Nat × Nat) :
-    inExc (merge s t h) p ↔ inExc s p ∨ inExc t p := by
-  have hpos : (merge s t h).positions = s.positions ∪ t.positions := rfl
-  simp only [inExc, hpos, Finset.mem_union]
-  constructor
-  · rintro ((hs | ht) | ⟨q, hs | ht, hatk⟩)
-    · exact Or.inl (Or.inl hs)
-    · exact Or.inr (Or.inl ht)
-    · exact Or.inl (Or.inr ⟨q, hs, hatk⟩)
-    · exact Or.inr (Or.inr ⟨q, ht, hatk⟩)
-  · rintro ((hs | ⟨q, hs, hatk⟩) | ht | ⟨q, ht, hatk⟩)
-    · exact Or.inl (Or.inl hs)
-    · exact Or.inr ⟨q, Or.inl hs, hatk⟩
-    · exact Or.inl (Or.inr ht)
-    · exact Or.inr ⟨q, Or.inr ht, hatk⟩
+    inExc (merge s t h) p ↔ inExc s p ∨ inExc t p := Iff.rfl
 
 #print axioms merge
 
 -- ── Sanity checks ────────────────────────────────────────────────────────────
 
-def s1 : SubSol := ⟨{(0, 0)}, by native_decide⟩
-def s2 : SubSol := ⟨{(1, 2)}, by native_decide⟩
-def s3 : SubSol := ⟨{(0, 1)}, by native_decide⟩
+def s1 : SubSol := singleton_subSol (0, 0)
+def s2 : SubSol := singleton_subSol (1, 2)
+def s3 : SubSol := singleton_subSol (0, 1)
 
 example : compatible s1 s2 := by native_decide
 #eval (merge s1 s2 (by native_decide)).positions

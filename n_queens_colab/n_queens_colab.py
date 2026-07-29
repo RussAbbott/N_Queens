@@ -99,20 +99,38 @@ def draw_board(solution, n, trace_steps=None):
         if trace_steps is not None and trace_steps.get('type') == 'repair_step':
             queens    = trace_steps['queens']
             moved_row = trace_steps.get('moved_row')
-            conflicted = set()
+            from_col  = trace_steps.get('from_col')
+            to_col    = trace_steps.get('to_col')
+            # Former conflict lines + faded dot — drawn first, behind everything.
+            if moved_row is not None and from_col is not None:
+                for r in range(n):
+                    if r == moved_row:
+                        continue
+                    c = queens[r]
+                    if c == from_col or abs(r - moved_row) == abs(c - from_col):
+                        ax.plot([from_col, c], [n - 1 - moved_row, n - 1 - r],
+                                color='#dd2222', linewidth=0.3, alpha=0.25, zorder=2)
+                ax.scatter([from_col], [n - 1 - moved_row],
+                           c=[QUEEN_FG], s=dot_s, alpha=0.25, zorder=3, linewidths=0)
+            # Current conflict lines.
             for r1 in range(n):
                 for r2 in range(r1 + 1, n):
                     c1, c2 = queens[r1], queens[r2]
                     if c1 == c2 or abs(r1 - r2) == abs(c1 - c2):
-                        conflicted.add(r1); conflicted.add(r2)
                         ax.plot([c1, c2], [n - 1 - r1, n - 1 - r2],
-                                color='#dd2222', linewidth=0.5, alpha=0.35, zorder=2)
-            dot_cols   = [queens[r] for r in range(n)]
-            dot_rows   = [n - 1 - r for r in range(n)]
-            dot_colors = ['#cc2200' if r == moved_row else
-                          '#4499ff' if r in conflicted else QUEEN_FG
-                          for r in range(n)]
-            ax.scatter(dot_cols, dot_rows, c=dot_colors, s=dot_s, zorder=4, linewidths=0)
+                                color='#dd2222', linewidth=0.5, alpha=0.35, zorder=3)
+            # All current queens in black.
+            dot_cols = [queens[r] for r in range(n)]
+            dot_rows = [n - 1 - r for r in range(n)]
+            ax.scatter(dot_cols, dot_rows, c=[QUEEN_FG], s=dot_s, zorder=4, linewidths=0)
+            # Green arrow from former to new position.
+            if moved_row is not None and from_col is not None:
+                ax.annotate('',
+                    xy=(to_col, n - 1 - moved_row),
+                    xytext=(from_col, n - 1 - moved_row),
+                    arrowprops=dict(arrowstyle='->', color='#00aa00',
+                                   lw=1.0, mutation_scale=10),
+                    zorder=5)
         elif solution is not None:
             cols = [solution[r] for r in range(n)]
             rows = [n - 1 - r  for r in range(n)]
@@ -171,20 +189,40 @@ def draw_board(solution, n, trace_steps=None):
         # ── Repair trace step ────────────────────────────────────────────────
         queens    = trace_steps['queens']
         moved_row = trace_steps.get('moved_row')
-        conflicted = set()
+        from_col  = trace_steps.get('from_col')
+        to_col    = trace_steps.get('to_col')
+        # Former conflict lines + faded queen — drawn first, behind everything.
+        if moved_row is not None and from_col is not None:
+            for r in range(n):
+                if r == moved_row:
+                    continue
+                c = queens[r]
+                if c == from_col or abs(r - moved_row) == abs(c - from_col):
+                    ax.plot([from_col + 0.5, c + 0.5],
+                            [n - 0.5 - moved_row, n - 0.5 - r],
+                            color='#dd2222', linewidth=0.8, alpha=0.25, zorder=2)
+            ax.text(from_col + 0.5, n - 0.5 - moved_row, '♛',
+                    ha='center', va='center', fontsize=queen_fs,
+                    color=QUEEN_FG, alpha=0.25, zorder=3)
+        # Current conflict lines.
         for r1 in range(n):
             for r2 in range(r1 + 1, n):
                 c1, c2 = queens[r1], queens[r2]
                 if c1 == c2 or abs(r1 - r2) == abs(c1 - c2):
-                    conflicted.add(r1); conflicted.add(r2)
                     ax.plot([c1 + 0.5, c2 + 0.5], [n - 0.5 - r1, n - 0.5 - r2],
                             color='#dd2222', linewidth=1.5, alpha=0.6, zorder=3)
+        # All current queens in black.
         for row in range(n):
-            if   row == moved_row:  color = '#cc2200'   # red   — just moved
-            elif row in conflicted: color = '#4499ff'   # blue  — in conflict
-            else:                   color = QUEEN_FG    # dark  — no conflict
             ax.text(queens[row] + 0.5, n - 0.5 - row, '♛',
-                    ha='center', va='center', fontsize=queen_fs, color=color, zorder=4)
+                    ha='center', va='center', fontsize=queen_fs, color=QUEEN_FG, zorder=4)
+        # Green arrow from former to new position.
+        if moved_row is not None and from_col is not None:
+            ax.annotate('',
+                xy=(to_col + 0.5, n - 0.5 - moved_row),
+                xytext=(from_col + 0.5, n - 0.5 - moved_row),
+                arrowprops=dict(arrowstyle='->', color='#00aa00',
+                               lw=1.5, mutation_scale=15),
+                zorder=5)
 
     elif trace_steps is not None:
         # ── Propagation trace step ───────────────────────────────────────────
