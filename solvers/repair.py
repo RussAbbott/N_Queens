@@ -70,51 +70,6 @@ def solve_n_queens_repair(n, trace=None, max_restarts=100):
         for _ in range(max_steps):
             steps_taken += 1
             key = tuple(queens)
-            if key in seen:
-                # Escape: pick the single-queen move that maximises total conflict
-                # reduction across the whole board, excluding the immediately
-                # preceding move (which would just cycle us back).
-                att_now       = [repair_attacks(queens, r, queens[r], n) for r in range(n)]
-                row           = random.choice([r for r, a in enumerate(att_now)
-                                               if a == max(att_now)])
-                old_col       = queens[row]
-                current_total = sum(att_now) // 2
-                excluded      = prev_move[1] if prev_move and prev_move[0] == row else None
-
-                best_delta = float('-inf')
-                best_cols  = []
-                for col in range(n):
-                    if col == old_col or col == excluded:
-                        continue
-                    queens[row] = col
-                    new_total = sum(repair_attacks(queens, r, queens[r], n)
-                                    for r in range(n)) // 2
-                    queens[row] = old_col
-                    delta = current_total - new_total
-                    if delta > best_delta:
-                        best_delta = delta; best_cols = [col]
-                    elif delta == best_delta:
-                        best_cols.append(col)
-
-                if not best_cols:   # excluded was the only candidate
-                    best_cols = [col for col in range(n) if col != old_col]
-
-                queens[row] = random.choice(best_cols) if best_cols else old_col
-                prev_move = (row, queens[row])
-                if trace is not None and len(trace) < MAX_TRACE:
-                    trace.append({
-                        'type':      'repair_step',
-                        'queens':    queens[:],
-                        'moved_row': row,
-                        'from_col':  old_col,
-                        'to_col':    queens[row],
-                        'restart':   restart + 1,
-                        'label':     (f'<i>Cycle</i> — escape: row {row + 1}: '
-                                      f'col {old_col + 1} → col {queens[row] + 1} '
-                                      f'(max conflict reduction, skipping last move). '
-                                      f'{conflict_summary(queens, n).capitalize()} remaining.'),
-                    })
-                continue
             seen.add(key)
 
             attacks  = [repair_attacks(queens, r, queens[r], n) for r in range(n)]
@@ -145,18 +100,62 @@ def solve_n_queens_repair(n, trace=None, max_restarts=100):
                     best_cols.append(col)
 
             queens[row] = random.choice(best_cols)
-            prev_move = (row, queens[row])
 
-            if trace is not None and len(trace) < MAX_TRACE and queens[row] != old_col:
-                trace.append({
-                    'type':      'repair_step',
-                    'queens':    queens[:],
-                    'moved_row': row,
-                    'from_col':  old_col,
-                    'to_col':    queens[row],
-                    'restart':   restart + 1,
-                    'label':     (f'Row {row + 1}: col {old_col + 1} → col {queens[row] + 1}. '
-                                  f'{conflict_summary(queens, n).capitalize()} remaining.'),
-                })
+            if tuple(queens) in seen:
+                # The normal move would revisit a seen state — undo it and escape instead.
+                queens[row] = old_col
+                current_total = sum(attacks) // 2
+                esc_row     = random.choice([r for r, a in enumerate(attacks)
+                                             if a == max_att])
+                esc_old_col = queens[esc_row]
+                excluded    = prev_move[1] if prev_move and prev_move[0] == esc_row else None
+
+                best_delta = float('-inf')
+                esc_cols   = []
+                for col in range(n):
+                    if col == esc_old_col or col == excluded:
+                        continue
+                    queens[esc_row] = col
+                    new_total = sum(repair_attacks(queens, r, queens[r], n)
+                                    for r in range(n)) // 2
+                    queens[esc_row] = esc_old_col
+                    delta = current_total - new_total
+                    if delta > best_delta:
+                        best_delta = delta; esc_cols = [col]
+                    elif delta == best_delta:
+                        esc_cols.append(col)
+
+                if not esc_cols:
+                    esc_cols = [col for col in range(n) if col != esc_old_col]
+
+                queens[esc_row] = random.choice(esc_cols) if esc_cols else esc_old_col
+                prev_move = (esc_row, queens[esc_row])
+                if trace is not None and len(trace) < MAX_TRACE:
+                    trace.append({
+                        'type':      'repair_step',
+                        'queens':    queens[:],
+                        'moved_row': esc_row,
+                        'from_col':  esc_old_col,
+                        'to_col':    queens[esc_row],
+                        'restart':   restart + 1,
+                        'label':     (f'<i>Cycle</i> — escape: row {esc_row + 1}: '
+                                      f'col {esc_old_col + 1} → col {queens[esc_row] + 1} '
+                                      f'(max conflict reduction, skipping last move). '
+                                      f'{conflict_summary(queens, n).capitalize()} remaining.'),
+                    })
+            else:
+                # Normal move committed.
+                prev_move = (row, queens[row])
+                if trace is not None and len(trace) < MAX_TRACE and queens[row] != old_col:
+                    trace.append({
+                        'type':      'repair_step',
+                        'queens':    queens[:],
+                        'moved_row': row,
+                        'from_col':  old_col,
+                        'to_col':    queens[row],
+                        'restart':   restart + 1,
+                        'label':     (f'Row {row + 1}: col {old_col + 1} → col {queens[row] + 1}. '
+                                      f'{conflict_summary(queens, n).capitalize()} remaining.'),
+                    })
 
     return None, trace, steps_taken
