@@ -28,7 +28,7 @@ def conflict_summary(queens, n):
     return ', '.join(parts) + f' conflict{s}'
 
 
-def _escape_cycle(queens, attacks, max_att, prev_move, n, trace, MAX_TRACE, restart):
+def escape_cycle(queens, attacks, max_att, prev_move, n, trace, MAX_TRACE, restart):
     """
     Pick the single-queen move that maximises total conflict reduction,
     excluding the immediately preceding move to avoid an immediate re-cycle.
@@ -73,7 +73,7 @@ def _escape_cycle(queens, attacks, max_att, prev_move, n, trace, MAX_TRACE, rest
     return (esc_row, queens[esc_row])
 
 
-def _repair_restart(queens, n, max_steps, MAX_TRACE, trace, restart):
+def repair_restart(queens, n, max_steps, MAX_TRACE, trace, restart):
     """
     Run one restart of the min-conflicts repair loop.
     Modifies queens in place.
@@ -115,7 +115,7 @@ def _repair_restart(queens, n, max_steps, MAX_TRACE, trace, restart):
 
         if tuple(queens) in seen:
             queens[row] = old_col
-            prev_move = _escape_cycle(queens, attacks, max_att, prev_move,
+            prev_move = escape_cycle(queens, attacks, max_att, prev_move,
                                       n, trace, MAX_TRACE, restart)
         else:
             prev_move = (row, queens[row])
@@ -170,7 +170,7 @@ def solve_n_queens_repair(n, trace=None, max_restarts=100):
                               f'{conflict_summary(queens, n).capitalize()}.'),
             })
 
-        result, steps = _repair_restart(queens, n, max_steps, MAX_TRACE, trace, restart)
+        result, steps = repair_restart(queens, n, max_steps, MAX_TRACE, trace, restart)
         steps_taken  += steps
         if result is not None:
             return result, trace, steps_taken
