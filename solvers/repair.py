@@ -84,8 +84,9 @@ def repair_restart(queens, n, max_steps, MAX_TRACE, trace, restart):
     Returns (solution, steps) where solution is the queens list on success,
     or (None, steps) if max_steps is exhausted without finding one.
     """
-    prev_move = None
-    seen      = set()
+    prev_move    = None
+    seen         = set()
+    trace_states = set()
     for step in range(max_steps):
         key = tuple(queens)
         seen.add(key)
@@ -123,8 +124,12 @@ def repair_restart(queens, n, max_steps, MAX_TRACE, trace, restart):
                                       n, seen, trace, MAX_TRACE, restart)
             if prev_move is None:
                 break  # no unseen escape; trigger restart
+            assert tuple(queens) not in trace_states, f"Duplicate after escape: {queens}"
+            trace_states.add(tuple(queens))
         else:
             prev_move = (row, queens[row])
+            assert tuple(queens) not in trace_states, f"Duplicate after normal move: {queens}"
+            trace_states.add(tuple(queens))
             if trace is not None and len(trace) < MAX_TRACE and queens[row] != old_col:
                 trace.append({
                     'type':      'repair_step',
