@@ -7,6 +7,12 @@ def repair_attacks(queens, row, col, n):
     Count how many queens (other than the one in `row`) would attack the cell
     (row, col).  Used to evaluate candidate columns for a queen: a count of 0
     means placing the queen at col would create no new conflicts.
+
+    Args:
+        queens: list of column positions, one per row (queens[r] = col of queen in row r).
+        row:    the row whose queen is being evaluated; excluded from the count.
+        col:    the candidate column to test for that queen.
+        n:      board size.
     """
     return sum(1 for r in range(n)
                if r != row and queens_conflict(r, queens[r], row, col))
@@ -17,6 +23,10 @@ def conflict_summary(queens, n):
     Returns a short human-readable phrase describing the current conflicts, e.g.
     '3 diagonal conflicts' or '1 column, 2 diagonal conflicts'.
     Used only for trace labels.
+
+    Args:
+        queens: list of column positions, one per row.
+        n:      board size.
     """
     col_conf  = sum(1 for r1 in range(n) for r2 in range(r1 + 1, n)
                     if queens[r1] == queens[r2])
@@ -48,6 +58,21 @@ def escape_cycle(queens, attacks, max_att, prev_move, n, seen, trace, MAX_TRACE,
     Returns the new prev_move tuple (esc_row, new_col), or None if every
     candidate destination is already in seen — in which case the caller should
     trigger a fresh restart.
+
+    Args:
+        queens:    list of column positions, modified in place.
+        attacks:   list of per-queen attack counts for the current board, as
+                   returned by repair_attacks for each row.
+        max_att:   the highest attack count in `attacks`; queens with this count
+                   are candidates to move.
+        prev_move: (row, col) of the immediately preceding move, or None if this
+                   is the first move of the restart.  Used to exclude the column
+                   that would simply undo that move.
+        n:         board size.
+        seen:      set of board states (as tuples) visited so far in this restart.
+        trace:     list to append trace steps to, or None if tracing is off.
+        MAX_TRACE: maximum number of trace steps to record.
+        restart:   0-based restart index, used in trace labels.
     """
     # Total conflicts across the whole board before the escape move.
     # We divide by 2 because each conflicting pair is counted twice (once per queen).
@@ -127,6 +152,14 @@ def repair_restart(queens, n, max_steps, MAX_TRACE, trace, restart):
     states rather than landing states.
 
     Returns (solution, steps) on success, or (None, steps) on failure.
+
+    Args:
+        queens:    list of column positions, modified in place.
+        n:         board size.
+        max_steps: maximum iterations before giving up and returning None.
+        MAX_TRACE: maximum number of trace steps to record.
+        trace:     list to append trace steps to, or None if tracing is off.
+        restart:   0-based restart index, used in trace labels.
     """
     prev_move    = None   # (row, col) of the most recent move, used by escape_cycle
     seen         = set()  # board states we have started an iteration from
@@ -213,9 +246,15 @@ def solve_n_queens_repair(n, trace=None, max_restarts=100):
     Fast in practice: typically finds a solution in O(N) repair steps, so
     it easily handles boards with thousands of queens.
 
+    Args:
+        n:            board size (number of queens and rows/columns).
+        trace:        list to append trace steps to, or None to skip tracing.
+        max_restarts: number of random restarts to attempt before giving up.
+
     Returns:
         (solution, trace, steps_taken)  — solution is list[int] (col per row)
-        or None on failure; steps_taken counts inner-loop iterations.
+        or None on failure; steps_taken counts inner-loop iterations across
+        all restarts.
     """
     max_steps   = max(1000, 5 * n)
     MAX_TRACE   = 150
